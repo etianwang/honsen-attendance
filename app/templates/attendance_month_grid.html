@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ team.name }} {{ year }}年{{ month }}月 整月预览{% endblock %}
+{% block content %}
+<h1>{{ team.name }} — {{ year }}年{{ month }}月 整月预览</h1>
+<div class="muted" style="margin-bottom:10px;">
+  <a href="/attendance/{{ team.id }}/{{ year if month > 1 else year - 1 }}/{{ month - 1 if month > 1 else 12 }}">&lsaquo; 上个月</a>
+  &middot;
+  <a href="/attendance/{{ team.id }}/{{ year if month < 12 else year + 1 }}/{{ month + 1 if month < 12 else 1 }}">下个月 &rsaquo;</a>
+  &middot;
+  <a href="/export/{{ team.id }}/{{ year }}/{{ month }}.xlsx">导出 Excel</a>
+</div>
+<div class="card table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th style="position:sticky;left:0;background:var(--surface);">姓名</th>
+        {% for d in days %}<th>{{ d }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td style="position:sticky;left:0;background:var(--surface-raised);white-space:nowrap;">
+          <a href="/attendance/{{ team.id }}/{{ year }}/{{ month }}/1">{{ row.name }}</a>
+        </td>
+        {% for cell in row.cells %}
+        <td style="white-space:nowrap;{{ '' if cell.complete or not cell.text else 'background:var(--rust-soft);' }}">
+          {% if cell.text %}
+          <a href="/attendance/{{ team.id }}/{{ year }}/{{ month }}/{{ cell.day }}" title="{{ cell.text }}">{{ cell.text }}</a>
+          {% else %}
+          <a href="/attendance/{{ team.id }}/{{ year }}/{{ month }}/{{ cell.day }}" class="muted">—</a>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

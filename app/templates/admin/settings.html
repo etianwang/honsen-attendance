@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}设置{% endblock %}
+{% block content %}
+<h1>设置</h1>
+
+<div class="card" style="padding:0;overflow:hidden;">
+  <div style="display:flex;border-bottom:1px solid var(--line);">
+    <button type="button" class="tab-btn {{ 'active' if tab == 'teams' }}" data-tab="teams" style="flex:1;border-radius:0;background:none;color:{{ 'var(--ink)' if tab == 'teams' else 'var(--ink-soft)' }};font-weight:700;padding:12px;">班组</button>
+    <button type="button" class="tab-btn {{ 'active' if tab == 'accounts' }}" data-tab="accounts" style="flex:1;border-radius:0;background:none;color:{{ 'var(--ink)' if tab == 'accounts' else 'var(--ink-soft)' }};font-weight:700;padding:12px;">账号</button>
+    <button type="button" class="tab-btn {{ 'active' if tab == 'values' }}" data-tab="values" style="flex:1;border-radius:0;background:none;color:{{ 'var(--ink)' if tab == 'values' else 'var(--ink-soft)' }};font-weight:700;padding:12px;">上/下午可选值</button>
+  </div>
+</div>
+
+<div class="tab-panel" data-panel="teams" style="{{ '' if tab == 'teams' else 'display:none;' }}">
+
+<div class="card">
+  <h2>新增班组</h2>
+  <form method="post" action="/admin/teams/add" class="grid-2" style="align-items:end;">
+    <div><label for="team-name">班组名称</label><input type="text" id="team-name" name="name" required /></div>
+    <div><button type="submit">添加</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>班组列表</h2>
+  <p class="muted">可以改名字，"停用"不会删掉这个班组的历史记录和员工信息，只是不再出现在日常录入/新建账号的选项里。</p>
+  {% for team in teams %}
+  <form id="team-form-{{ team.id }}" method="post" action="/admin/teams/{{ team.id }}/rename"></form>
+  {% endfor %}
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>ID</th><th>名称</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+      {% for team in teams %}
+      <tr>
+        <td>{{ team.id }}</td>
+        <td><input type="text" form="team-form-{{ team.id }}" name="name" value="{{ team.name }}" style="margin:0;min-width:140px;" required /></td>
+        <td>{{ "启用" if team.is_active else "停用" }}</td>
+        <td>
+          <button type="submit" form="team-form-{{ team.id }}" class="small">保存</button>
+          <form method="post" action="/admin/teams/{{ team.id }}/toggle-active" style="display:inline;"
+                onsubmit="{{ '' if team.is_active else 'return true;' }}{{ 'return confirm(\'停用后这个班组不会再出现在日常录入和新建账号的选项里，历史记录不会丢，确定吗？\');' if team.is_active }}">
+            <button type="submit" class="small ghost">{{ "停用" if team.is_active else "启用" }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+</div>
+
+<div class="tab-panel" data-panel="accounts" style="{{ '' if tab == 'accounts' else 'display:none;' }}">
+
+<div class="card">
+  <h2>新增账号</h2>
+  <form method="post" action="/admin/users/add">
+    <div class="grid-2">
+      <div><label for="username">账号</label><input type="text" id="username" name="username" required /></div>
+      <div><label for="display_name">姓名</label><input type="text" id="display_name" name="display_name" required /></div>
+    </div>
+    <div class="grid-2">
+      <div><label for="password">初始密码</label><input type="text" id="password" name="password" required /></div>
+      <div><label for="role">角色</label>
+        <select id="role" name="role">
+          <option value="team_lead">班组长</option>
+          <option value="admin">管理员</option>
+        </select>
+      </div>
+    </div>
+    <label for="team_id">所属班组（班组长必选，管理员不需要）</label>
+    <select id="team_id" name="team_id">
+      <option value="">—</option>
+      {% for team in teams if team.is_active %}<option value="{{ team.id }}">{{ team.name }}</option>{% endfor %}
+    </select>
+    <button type="submit">创建账号</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>账号列表</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>账号</th><th>姓名</th><th>角色</th><th>班组</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.username }}</td>
+        <td>{{ u.display_name }}</td>
+        <td>{{ "管理员" if u.role == UserRole.admin else "班组长" }}</td>
+        <td>{{ u.team.name if u.team else "—" }}</td>
+        <td>{{ "启用" if u.is_active else "停用" }}</td>
+        <td>
+          <form method="post" action="/admin/users/{{ u.id }}/reset-password" style="display:inline-flex;gap:4px;">
+            <input type="text" name="new_password" placeholder="新密码" style="width:100px;margin:0;" required />
+            <button type="submit" class="small ghost">重置密码</button>
+          </form>
+          <form method="post" action="/admin/users/{{ u.id }}/toggle-active" style="display:inline;">
+            <button type="submit" class="small ghost">{{ "停用" if u.is_active else "启用" }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+</div>
+
+<div class="tab-panel" data-panel="values" style="{{ '' if tab == 'values' else 'display:none;' }}">
+
+<div class="card">
+  <h2>新增值</h2>
+  <p class="muted">这里新增的值会立刻出现在所有班组录入页的下拉里，不需要重新部署。</p>
+  <form method="post" action="/admin/values/add">
+    <div class="grid-2">
+      <div><label for="code">名称</label><input type="text" id="code" name="code" required placeholder="比如新工地名" /></div>
+      <div><label for="category">类别</label>
+        <select id="category" name="category">
+          <option value="worksite">上班（工地/出差/外勤等）</option>
+          <option value="nonwork">非上班（休息/请假等）</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div><label for="sort_order">排序（越小越靠前）</label><input type="number" id="sort_order" name="sort_order" value="0" /></div>
+      <div style="display:flex;align-items:end;">
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-size:13px;">
+          <input type="checkbox" name="requires_note" value="true" style="width:auto;margin:0;" /> 需要填备注（比如"出差""外勤"）
+        </label>
+      </div>
+    </div>
+    <button type="submit">添加</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>现有值（可以直接改，改完点保存）</h2>
+  {% for v in values %}
+  <form id="value-form-{{ v.id }}" method="post" action="/admin/values/{{ v.id }}/update"></form>
+  {% endfor %}
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>名称</th><th>类别</th><th>需要备注</th><th>排序</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+      {% for v in values %}
+      <tr>
+        <td><input type="text" form="value-form-{{ v.id }}" name="code" value="{{ v.code }}" style="margin:0;min-width:100px;" required /></td>
+        <td>
+          <select form="value-form-{{ v.id }}" name="category" style="margin:0;">
+            <option value="worksite" {{ "selected" if v.category.value == "worksite" }}>上班</option>
+            <option value="nonwork" {{ "selected" if v.category.value == "nonwork" }}>非上班</option>
+          </select>
+        </td>
+        <td>
+          <input type="checkbox" form="value-form-{{ v.id }}" name="requires_note" value="true" style="width:auto;margin:0;" {{ "checked" if v.requires_note }} />
+        </td>
+        <td><input type="number" form="value-form-{{ v.id }}" name="sort_order" value="{{ v.sort_order }}" style="margin:0;width:70px;" /></td>
+        <td>{{ "启用" if v.is_active else "停用" }}</td>
+        <td>
+          <button type="submit" form="value-form-{{ v.id }}" class="small">保存</button>
+          <form method="post" action="/admin/values/{{ v.id }}/toggle-active" style="display:inline;">
+            <button type="submit" class="small ghost">{{ "停用" if v.is_active else "启用" }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+</div>
+
+<footer style="text-align:center;padding:20px 0 4px;">
+  <a href="https://github.com/etianwang" target="_blank" rel="noopener" class="muted" style="font-size:12px;">design by Etienne</a>
+</footer>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.style.color = 'var(--ink-soft)'; });
+      btn.classList.add('active'); btn.style.color = 'var(--ink)';
+      document.querySelectorAll('.tab-panel').forEach(p => p.style.display = p.dataset.panel === btn.dataset.tab ? '' : 'none');
+      const url = new URL(window.location);
+      url.searchParams.set('tab', btn.dataset.tab);
+      window.history.replaceState({}, '', url);
+    });
+  });
+})();
+</script>
+{% endblock %}

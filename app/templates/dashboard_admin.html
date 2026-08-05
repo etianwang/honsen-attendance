@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}首页 · 喀麦隆考勤系统{% endblock %}
+{% block content %}
+<h1>各班组今日录入情况（{{ today.year }}-{{ today.month }}-{{ today.day }}）</h1>
+<div class="card">
+  <a class="btn" href="/admin/attendance/{{ today.year }}/{{ today.month }}/{{ today.day }}">全体录入（跨班组一起批量录入，不用一个组一个组点）</a>
+</div>
+<div class="card">
+  <table>
+    <thead><tr><th>班组</th><th>操作</th></tr></thead>
+    <tbody>
+      {% for team in teams %}
+      <tr>
+        <td>{{ team.name }}</td>
+        <td>
+          <a class="btn small" href="/attendance/{{ team.id }}/{{ today.year }}/{{ today.month }}/{{ today.day }}">今日录入</a>
+          <a class="btn small ghost" href="/attendance/{{ team.id }}/{{ today.year }}/{{ today.month }}">整月预览</a>
+          <a class="btn small ghost" href="/roster/{{ team.id }}?year={{ today.year }}&month={{ today.month }}">花名册</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

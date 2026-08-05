@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}员工管理{% endblock %}
+{% block content %}
+<h1>员工管理</h1>
+<p class="muted">全公司所有员工，不分班组。"当前班组"是本月的花名册状态；一个人同时在多个班组时会都列出来，没在任何花名册里的显示"—"。</p>
+
+<div class="card">
+  <h2>新增员工</h2>
+  <form method="post" action="/admin/employees/add" class="grid-2" style="align-items:end;">
+    <div><label for="new-employee-name">姓名</label><input type="text" id="new-employee-name" name="full_name" required placeholder="填完姓名后可以去他的个人信息页补充其他资料" /></div>
+    <div><button type="submit">创建</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <form method="get" action="/admin/employees" class="grid-2" style="align-items:end;">
+    <div><label for="q">搜索姓名</label><input type="text" id="q" name="q" value="{{ q }}" placeholder="输入姓名关键字" /></div>
+    <div><button type="submit">搜索</button></div>
+  </form>
+</div>
+
+<div class="card table-scroll">
+  {% if rows|length == 0 %}
+  <p class="muted">没有找到员工。</p>
+  {% else %}
+  <table>
+    <thead><tr><th>姓名</th><th>状态</th><th>当前班组</th><th>操作</th></tr></thead>
+    <tbody>
+      {% for employee, teams in rows %}
+      <tr>
+        <td>{{ employee.full_name }}</td>
+        <td>
+          {% if employee.status == EmployeeStatus.active %}<span class="pill ok">在场</span>
+          {% elif employee.status == EmployeeStatus.returned %}<span class="pill nonwork">回国</span>
+          {% else %}<span class="pill nonwork">停工</span>{% endif %}
+        </td>
+        <td>{{ teams|join("、") if teams else "—" }}</td>
+        <td><a class="btn small ghost" href="/employee/{{ employee.id }}">个人信息</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

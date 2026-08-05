@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}统计{% endblock %}
+{% block content %}
+<h1>统计 — 工地用工情况</h1>
+<p class="muted">单位：人天（半天数/2）。用于项目人工报价、成本核算。一个人身兼数职（同时在多个班组）时，两个班组各自的天数互不影响、不重复计算。
+  {% if start_date and end_date %}统计范围：{{ start_date }} 至 {{ end_date }}{% elif scope == "all" %}统计范围：自有记录以来累计{% endif %}
+</p>
+
+<div class="card">
+  <form method="get" action="/admin/stats" id="scope-form">
+    <div class="grid-2">
+      <div>
+        <label for="scope">口径</label>
+        <select id="scope" name="scope">
+          <option value="month" {{ "selected" if scope == "month" }}>按月</option>
+          <option value="quarter" {{ "selected" if scope == "quarter" }}>按季度</option>
+          <option value="half" {{ "selected" if scope == "half" }}>按半年</option>
+          <option value="year" {{ "selected" if scope == "year" }}>按年</option>
+          <option value="custom" {{ "selected" if scope == "custom" }}>自定义起止日期</option>
+          <option value="all" {{ "selected" if scope == "all" }}>自有记录以来累计</option>
+        </select>
+      </div>
+      <div id="field-year">
+        <label for="year">年份</label>
+        <input type="number" id="year" name="year" value="{{ year }}" />
+      </div>
+    </div>
+    <div class="grid-2">
+      <div id="field-month">
+        <label for="month">月份</label>
+        <select id="month" name="month">
+          {% for m in range(1, 13) %}<option value="{{ m }}" {{ "selected" if month == m }}>{{ m }}月</option>{% endfor %}
+        </select>
+      </div>
+      <div id="field-quarter">
+        <label for="quarter">季度</label>
+        <select id="quarter" name="quarter">
+          {% for q in range(1, 5) %}<option value="{{ q }}" {{ "selected" if quarter == q }}>第{{ q }}季度</option>{% endfor %}
+        </select>
+      </div>
+      <div id="field-half">
+        <label for="half">半年</label>
+        <select id="half" name="half">
+          <option value="1" {{ "selected" if half == 1 }}>上半年</option>
+          <option value="2" {{ "selected" if half == 2 }}>下半年</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-2" id="field-custom">
+      <div>
+        <label for="start">起始日期</label>
+        <input type="date" id="start" name="start" value="{{ start }}" />
+      </div>
+      <div>
+        <label for="end">结束日期</label>
+        <input type="date" id="end" name="end" value="{{ end }}" />
+      </div>
+    </div>
+    <button type="submit">查询</button>
+  </form>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden;">
+  <div style="display:flex;border-bottom:1px solid var(--line);">
+    <button type="button" class="tab-btn active" data-tab="site" style="flex:1;border-radius:0;background:none;color:var(--ink);font-weight:700;padding:12px;">工地 &times; 班组</button>
+    <button type="button" class="tab-btn" data-tab="person" style="flex:1;border-radius:0;background:none;color:var(--ink-soft);font-weight:700;padding:12px;">按人员</button>
+  </div>
+
+  <div class="tab-panel" data-panel="site" style="padding:16px;">
+    <div class="muted" style="margin-bottom:8px;">
+      <a href="/export/labor-stats.xlsx?scope={{ scope }}&year={{ year }}&month={{ month }}&quarter={{ quarter }}&half={{ half }}&start={{ start }}&end={{ end }}">导出 Excel</a>
+    </div>
+    {% if pivot.sites|length == 0 %}
+    <p class="muted">这个口径下还没有数据。</p>
+    {% else %}
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>工地 \ 班组</th>{% for team in pivot.teams %}<th>{{ team }}</th>{% endfor %}<th>合计</th></tr>
+      </thead>
+      <tbody>
+        {% set grand_total = namespace(v=0) %}
+        {% set col_totals = namespace(v={}) %}
+        {% for site in pivot.sites %}
+        <tr>
+          <td><b>{{ site }}</b></td>
+          {% set row_total = namespace(v=0) %}
+          {% for team in pivot.teams %}
+          {% set row_total.v = row_total.v + pivot.grid[site][team] %}
+          {% set _ = col_totals.v.update({team: col_totals.v.get(team, 0) + pivot.grid[site][team]}) %}
+          <td>{{ "%.1f"|format(pivot.grid[site][team]) if pivot.grid[site][team] else "-" }}</td>
+          {% endfor %}
+          {% set grand_total.v = grand_total.v + row_total.v %}
+          <td style="background:var(--accent-soft);"><b style="font-size:15px;">{{ "%.1f"|format(row_total.v) }}</b></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--surface);">
+          <td><b>合计</b></td>
+          {% for team in pivot.teams %}<td><b>{{ "%.1f"|format(col_totals.v.get(team, 0)) }}</b></td>{% endfor %}
+          <td style="background:var(--accent-soft);"><b style="font-size:16px;color:var(--accent-ink);">{{ "%.1f"|format(grand_total.v) }}</b></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="tab-panel" data-panel="person" style="padding:16px;display:none;">
+    <div class="muted" style="margin-bottom:8px;">
+      <a href="/export/person-stats.xlsx?scope={{ scope }}&year={{ year }}&month={{ month }}&quarter={{ quarter }}&half={{ half }}&start={{ start }}&end={{ end }}">导出 Excel（含类别天数汇总 + 工地×班组明细两个表）</a>
+    </div>
+
+    <h2 style="font-size:14px;">个人天数汇总（本期范围内，跨班组已合并折叠，不重复计/不误伤）</h2>
+    {% if person_category_rows|length == 0 %}
+    <p class="muted">这个口径下还没有数据。</p>
+    {% else %}
+    <div class="table-scroll" style="margin-bottom:20px;">
+    <table>
+      <thead>
+        <tr>
+          <th>姓名</th>
+          {% for code in category_codes %}<th>{{ code }}天数</th>{% endfor %}
+          <th>加班天数</th>
+          <th>超出配额天数</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in person_category_rows %}
+        <tr>
+          <td><a href="/employee/{{ row.employee_id }}">{{ row.name }}</a></td>
+          {% for code in category_codes %}<td>{{ "%.1f"|format(row.by_code_days.get(code, 0.0)) }}</td>{% endfor %}
+          <td>{{ "%.1f"|format(row.overtime_days) }}</td>
+          <td>{{ "%.1f"|format(row.excess_over_quota_days) }}{% if row.excess_over_quota_days > 0 %} <span class="pill nonwork">超</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="muted" style="margin-top:-14px;margin-bottom:20px;">超出配额天数按自然月分别结算后相加，不跨月累加配额——比如某月休息超了1天，下个月没休息，总超出天数还是1天，不会被下个月"抵消"。</p>
+    {% endif %}
+
+    <h2 style="font-size:14px;">工地 &times; 班组明细（同一人可能身兼数职，按每个班组各自的记录分别列出，不合并）</h2>
+    {% if person_rows|length == 0 %}
+    <p class="muted">这个口径下还没有数据。</p>
+    {% else %}
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>姓名</th><th>班组</th><th>工地</th><th>天数</th></tr></thead>
+      <tbody>
+        {% for row in person_rows %}
+        <tr>
+          <td><a href="/employee/{{ row.employee_id }}">{{ row.name }}</a></td>
+          <td>{{ row.team }}</td>
+          <td>{{ row.site }}</td>
+          <td>{{ "%.1f"|format(row.man_days) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const scopeSel = document.getElementById('scope');
+  const fields = {
+    month: [document.getElementById('field-year'), document.getElementById('field-month')],
+    quarter: [document.getElementById('field-year'), document.getElementById('field-quarter')],
+    half: [document.getElementById('field-year'), document.getElementById('field-half')],
+    year: [document.getElementById('field-year')],
+    custom: [document.getElementById('field-custom')],
+    all: [],
+  };
+  const all = [document.getElementById('field-year'), document.getElementById('field-month'),
+               document.getElementById('field-quarter'), document.getElementById('field-half'),
+               document.getElementById('field-custom')];
+  function refreshScopeFields(){
+    all.forEach(el => el.style.display = 'none');
+    (fields[scopeSel.value] || []).forEach(el => el.style.display = '');
+  }
+  scopeSel.addEventListener('change', refreshScopeFields);
+  refreshScopeFields();
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.style.color = 'var(--ink-soft)'; });
+      btn.classList.add('active'); btn.style.color = 'var(--ink)';
+      document.querySelectorAll('.tab-panel').forEach(p => p.style.display = p.dataset.panel === btn.dataset.tab ? '' : 'none');
+    });
+  });
+})();
+</script>
+{% endblock %}

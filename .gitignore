@@ -1,0 +1,10 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+uploads/
+secrets/
+.pytest_cache/
+
+# Real employee attendance data — repo is public, never publish this.
+科特迪瓦考勤登记表2026.xlsx

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}花名册 · {{ team.name }}{% endblock %}
+{% block content %}
+<h1>{{ team.name }} — {{ year }}年{{ month }}月 花名册</h1>
+
+<div class="card">
+  <div class="grid-2" style="max-width:320px;">
+    <form method="get" action="/roster/{{ team.id }}">
+      <label for="ym">切换月份</label>
+      <input type="month" id="ym" name="ym" value="{{ '%04d-%02d' % (year, month) }}"
+             onchange="var v=this.value.split('-');location.href='/roster/{{ team.id }}?year='+v[0]+'&month='+parseInt(v[1]);" />
+    </form>
+  </div>
+
+  {% if roster|length == 0 %}
+  <p class="muted">这个月还没有花名册。</p>
+  <form method="post" action="/roster/{{ team.id }}/copy-forward">
+    <input type="hidden" name="year" value="{{ year }}" />
+    <input type="hidden" name="month" value="{{ month }}" />
+    <button type="submit">从上月复制花名册</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>添加组员</h2>
+  <p class="muted">只能从状态为"在场"的员工里选——新员工请先去<a href="/admin/employees">员工管理</a>页创建。</p>
+  <label for="candidate-search">搜索姓名</label>
+  <input type="text" id="candidate-search" placeholder="输入姓名筛选" />
+
+  <div class="grid-2">
+    <div>
+      <div class="muted" style="margin-bottom:6px;">候选人（{{ candidates|length }}）</div>
+      <div id="candidate-list" class="table-scroll" style="max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;">
+        {% for e in candidates %}
+        <div class="candidate-row" data-id="{{ e.id }}" data-name="{{ e.full_name|lower }}" style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--line);">
+          <span>{{ e.full_name }}</span>
+          <button type="button" class="small add-candidate-btn">+</button>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div>
+      <div class="muted" style="margin-bottom:6px;">已选（<span id="staged-count">0</span>）</div>
+      <div id="staged-list" style="min-height:40px;border:1px solid var(--line);border-radius:10px;">
+        <p class="muted" id="staged-empty-hint" style="padding:10px;margin:0;">还没有选人</p>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" action="/roster/{{ team.id }}/add-bulk" id="add-bulk-form" style="margin-top:12px;">
+    <input type="hidden" name="year" value="{{ year }}" />
+    <input type="hidden" name="month" value="{{ month }}" />
+    <div id="staged-inputs"></div>
+    <button type="submit" id="confirm-add-btn" disabled>确定添加</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>当月组员（{{ roster|length }} 人）</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>姓名</th><th>操作</th></tr></thead>
+    <tbody>
+      {% for row in roster %}
+      <tr>
+        <td>{{ row.employee.full_name }}</td>
+        <td>
+          <a class="btn small ghost" href="/employee/{{ row.employee_id }}">个人信息</a>
+          <form method="post" action="/roster/{{ team.id }}/remove" style="display:inline;" onsubmit="return confirmWithPassword(this, '确定要把 {{ row.employee.full_name }} 从这个月移除吗？');">
+            <input type="hidden" name="year" value="{{ year }}" />
+            <input type="hidden" name="month" value="{{ month }}" />
+            <input type="hidden" name="employee_id" value="{{ row.employee_id }}" />
+            <input type="hidden" name="confirm_password" value="" />
+            <button type="submit" class="small ghost">移除</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/confirm_password.js"></script>
+<script>
+(function(){
+  const search = document.getElementById('candidate-search');
+  const candidateList = document.getElementById('candidate-list');
+  const stagedList = document.getElementById('staged-list');
+  const stagedEmptyHint = document.getElementById('staged-empty-hint');
+  const stagedInputs = document.getElementById('staged-inputs');
+  const stagedCount = document.getElementById('staged-count');
+  const confirmBtn = document.getElementById('confirm-add-btn');
+
+  function refreshConfirmState(){
+    const n = stagedList.querySelectorAll('.staged-row').length;
+    stagedCount.textContent = n;
+    confirmBtn.disabled = n === 0;
+    stagedEmptyHint.style.display = n === 0 ? '' : 'none';
+  }
+
+  candidateList.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.add-candidate-btn');
+    if (!btn) return;
+    const row = btn.closest('.candidate-row');
+    const id = row.dataset.id;
+    const name = row.querySelector('span').textContent;
+    row.remove();
+
+    const stagedRow = document.createElement('div');
+    stagedRow.className = 'staged-row';
+    stagedRow.dataset.id = id;
+    stagedRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--line);';
+    stagedRow.innerHTML = '<span></span><button type="button" class="small ghost remove-staged-btn">&times;</button>';
+    stagedRow.querySelector('span').textContent = name;
+    stagedList.appendChild(stagedRow);
+
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'employee_ids';
+    hidden.value = id;
+    hidden.dataset.forId = id;
+    stagedInputs.appendChild(hidden);
+
+    refreshConfirmState();
+  });
+
+  stagedList.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.remove-staged-btn');
+    if (!btn) return;
+    const row = btn.closest('.staged-row');
+    const id = row.dataset.id;
+    const name = row.querySelector('span').textContent;
+    row.remove();
+    stagedInputs.querySelector(`input[data-for-id="${id}"]`).remove();
+
+    const candidateRow = document.createElement('div');
+    candidateRow.className = 'candidate-row';
+    candidateRow.dataset.id = id;
+    candidateRow.dataset.name = name.toLowerCase();
+    candidateRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--line);';
+    candidateRow.innerHTML = '<span></span><button type="button" class="small add-candidate-btn">+</button>';
+    candidateRow.querySelector('span').textContent = name;
+    candidateList.appendChild(candidateRow);
+
+    refreshConfirmState();
+  });
+
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    candidateList.querySelectorAll('.candidate-row').forEach(row => {
+      row.style.display = row.dataset.name.includes(q) ? '' : 'none';
+    });
+  });
+
+  refreshConfirmState();
+})();
+</script>
+{% endblock %}

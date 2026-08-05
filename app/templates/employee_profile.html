@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ employee.full_name }} · 个人信息{% endblock %}
+{% block content %}
+<h1>{{ employee.full_name }} — 个人信息</h1>
+
+<div class="card" style="max-width:360px;">
+  <h2>头像</h2>
+  {% if employee.avatar_path %}
+  <img src="/employee/{{ employee.id }}/avatar-file" alt="头像" style="width:120px;height:150px;object-fit:cover;border-radius:8px;border:1px solid var(--line);margin-bottom:10px;" />
+  {% else %}
+  <div class="muted" style="margin-bottom:10px;">还没有上传头像</div>
+  {% endif %}
+  <form method="post" action="/employee/{{ employee.id }}/avatar" enctype="multipart/form-data">
+    <input type="file" name="avatar" accept="image/*" capture="environment" required />
+    <button type="submit">上传/更换头像</button>
+  </form>
+</div>
+
+<div class="card" style="max-width:360px;">
+  <h2>基本信息</h2>
+  <p class="muted">员工编号 #{{ employee.id }}（内部固定不变，改名字不会影响他的历史花名册/考勤记录）</p>
+  <form method="post" action="/employee/{{ employee.id }}">
+    <label for="full_name">姓名</label>
+    <input type="text" id="full_name" name="full_name" value="{{ employee.full_name }}" required />
+
+    <label for="status">状态</label>
+    <select id="status" name="status">
+      <option value="active" {{ "selected" if employee.status.value == "active" }}>在场</option>
+      <option value="returned" {{ "selected" if employee.status.value == "returned" }}>回国</option>
+      <option value="suspended" {{ "selected" if employee.status.value == "suspended" }}>停工</option>
+    </select>
+
+    <label for="phone">电话</label>
+    <input type="text" id="phone" name="phone" value="{{ employee.phone or '' }}" />
+
+    <label for="blood_type">血型</label>
+    <select id="blood_type" name="blood_type">
+      <option value="">—</option>
+      {% for bt in blood_types %}
+      <option value="{{ bt }}" {{ "selected" if employee.blood_type == bt }}>{{ bt }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="emergency_contact_name">紧急联系人姓名</label>
+    <input type="text" id="emergency_contact_name" name="emergency_contact_name" value="{{ employee.emergency_contact_name or '' }}" />
+
+    <label for="emergency_contact_phone">紧急联系人电话</label>
+    <input type="text" id="emergency_contact_phone" name="emergency_contact_phone" value="{{ employee.emergency_contact_phone or '' }}" />
+
+    <button type="submit">保存</button>
+  </form>
+</div>
+
+{% if user.role.value == "admin" %}
+<div class="card" style="max-width:360px;">
+  <h2>危险操作</h2>
+  <p class="muted">永久删除这个人的档案。只有当他从没上过任何一个月的花名册（也就是完全没有考勤历史）时才能删成功，否则会被挡住——想不再出现在某个月只需要去花名册页"移除"就行，不需要也不应该用这个。</p>
+  <form method="post" action="/employee/{{ employee.id }}/delete"
+        onsubmit="return confirmWithPassword(this, '确定要永久删除 {{ employee.full_name }} 吗？这个操作无法撤销。');">
+    <input type="hidden" name="confirm_password" value="" />
+    <button type="submit" class="ghost" style="border-color:var(--rust);color:var(--rust);">永久删除该员工</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/confirm_password.js"></script>
+{% endblock %}
