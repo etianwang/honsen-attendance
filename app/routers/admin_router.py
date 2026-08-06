@@ -105,6 +105,27 @@ def admin_users_add(
     return RedirectResponse(url="/admin/settings?tab=accounts&ok=已创建账号", status_code=303)
 
 
+@router.post("/users/{user_id}/change-team")
+def admin_users_change_team(user_id: int, team_id: str = Form(""), db: Session = Depends(get_db)):
+    """Lets an existing team_lead be reassigned to a different team — needed
+    once their original team gets deactivated, or they simply move teams.
+    Previously team_id could only be set once, at account creation, with no
+    way to change it afterward."""
+    target = db.get(User, user_id)
+    if target is None:
+        return RedirectResponse(url="/admin/settings?tab=accounts&err=找不到该账号", status_code=303)
+    if target.role != UserRole.team_lead:
+        return RedirectResponse(url="/admin/settings?tab=accounts&err=只有班组长账号才需要绑定班组", status_code=303)
+    if not team_id:
+        return RedirectResponse(url="/admin/settings?tab=accounts&err=班组长账号必须绑定一个班组", status_code=303)
+    team = db.get(Team, int(team_id))
+    if team is None:
+        return RedirectResponse(url="/admin/settings?tab=accounts&err=找不到该班组", status_code=303)
+    target.team_id = team.id
+    db.commit()
+    return RedirectResponse(url=f"/admin/settings?tab=accounts&ok=已把{target.username}的班组改成{team.name}", status_code=303)
+
+
 @router.post("/users/{user_id}/reset-password")
 def admin_reset_password(user_id: int, new_password: str = Form(...), db: Session = Depends(get_db)):
     target = db.get(User, user_id)

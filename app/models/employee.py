@@ -16,7 +16,10 @@ class Employee(Base):
     __tablename__ = "employees"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    full_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # Unique — same-name-different-person isn't handled; a name collision is
+    # treated as an error the admin resolves (edit one of them), not a case
+    # the system tries to disambiguate on its own.
+    full_name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)

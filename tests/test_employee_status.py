@@ -1,6 +1,17 @@
+import pytest
+from sqlalchemy.exc import IntegrityError
+
 from app.models import AttendanceEntry, AttendanceValue, Employee, EmployeeStatus, MonthlyRoster, Team, User, UserRole, ValueCategory
 from app.services.attendance_service import get_huiguo_value_id, sync_employee_status_from_entry
 from app.services.roster_service import add_employees_bulk, list_present_candidates
+
+
+def test_employee_full_name_must_be_unique(db):
+    db.add(Employee(full_name="张三"))
+    db.commit()
+    db.add(Employee(full_name="张三"))
+    with pytest.raises(IntegrityError):
+        db.commit()
 
 
 def test_list_present_candidates_excludes_current_team_but_not_other_teams(db):

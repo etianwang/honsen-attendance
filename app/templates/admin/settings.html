@@ -81,6 +81,9 @@
 
 <div class="card">
   <h2>账号列表</h2>
+  {% for u in users if u.role == UserRole.team_lead %}
+  <form id="user-team-form-{{ u.id }}" method="post" action="/admin/users/{{ u.id }}/change-team"></form>
+  {% endfor %}
   <div class="table-scroll">
   <table>
     <thead><tr><th>账号</th><th>姓名</th><th>角色</th><th>班组</th><th>状态</th><th>操作</th></tr></thead>
@@ -90,9 +93,22 @@
         <td>{{ u.username }}</td>
         <td>{{ u.display_name }}</td>
         <td>{{ "管理员" if u.role == UserRole.admin else "班组长" }}</td>
-        <td>{{ u.team.name if u.team else "—" }}</td>
+        <td>
+          {% if u.role == UserRole.team_lead %}
+          <select form="user-team-form-{{ u.id }}" name="team_id" style="margin:0;min-width:120px;">
+            {% for team in teams if team.is_active or team.id == u.team_id %}
+            <option value="{{ team.id }}" {{ "selected" if team.id == u.team_id }}>{{ team.name }}{{ "" if team.is_active else "（已停用）" }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          —
+          {% endif %}
+        </td>
         <td>{{ "启用" if u.is_active else "停用" }}</td>
         <td>
+          {% if u.role == UserRole.team_lead %}
+          <button type="submit" form="user-team-form-{{ u.id }}" class="small">保存班组</button>
+          {% endif %}
           <form method="post" action="/admin/users/{{ u.id }}/reset-password" style="display:inline-flex;gap:4px;">
             <input type="text" name="new_password" placeholder="新密码" style="width:100px;margin:0;" required />
             <button type="submit" class="small ghost">重置密码</button>

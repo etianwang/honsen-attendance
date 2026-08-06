@@ -2,6 +2,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -47,6 +48,8 @@ def admin_employee_create(
     full_name = full_name.strip()
     if not full_name:
         return RedirectResponse(url="/admin/employees?err=姓名不能为空", status_code=303)
+    if db.scalar(select(Employee).where(Employee.full_name == full_name)):
+        return RedirectResponse(url=f"/admin/employees?err=已经有一个叫{full_name}的员工了，姓名不能重复", status_code=303)
     employee = Employee(full_name=full_name)
     db.add(employee)
     db.commit()
@@ -85,6 +88,11 @@ def employee_profile_update(
     full_name = full_name.strip()
     if not full_name:
         return RedirectResponse(url=f"/employee/{employee_id}?err=姓名不能为空", status_code=303)
+    conflict = db.scalar(select(Employee).where(Employee.full_name == full_name, Employee.id != employee_id))
+    if conflict is not None:
+        return RedirectResponse(
+            url=f"/employee/{employee_id}?err=已经有一个叫{full_name}的员工了，姓名不能重复", status_code=303
+        )
     employee.full_name = full_name
     employee.status = EmployeeStatus(status)
     employee.phone = phone.strip() or None
