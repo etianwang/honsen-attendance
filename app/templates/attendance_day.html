@@ -23,33 +23,36 @@
 
 <div class="card">
   <h2>当日合照</h2>
-  <p class="muted">拍一张全员合照，方便人工核对人数和人员，防止代打卡。</p>
-  {% if photo %}
-  <img src="/attendance/{{ team.id }}/{{ year }}/{{ month }}/{{ day }}/photo-file" alt="当日合照"
-       style="max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--line);margin-bottom:8px;display:block;" />
-  <p class="muted" id="photo-status">
-    {% if photo.drive_status.value == "uploaded" %}
-      <span class="pill ok">已同步到云端</span>
-    {% elif photo.drive_status.value == "failed" %}
-      <span class="pill nonwork">同步失败，已保存在服务器</span> {{ photo.drive_error or "" }}
-      <button type="button" class="small ghost" id="retry-sync-btn">重试同步</button>
-    {% else %}
-      <span class="pill worksite">已保存在服务器，等待同步到云端</span>
-      <button type="button" class="small ghost" id="retry-sync-btn">重试同步</button>
-    {% endif %}
-  </p>
-  {% else %}
-  <p class="muted" id="photo-status">今天还没有上传合照</p>
-  {% endif %}
-  <form id="photo-form" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
-    <div style="flex:1;min-width:180px;">
-      <input type="file" id="photo-input" name="photo" accept="image/*" capture="environment" required style="margin-bottom:0;" />
+  <p class="muted">最多传{{ max_daily_photos }}张，不限上下班/加班类型，随时加随时删。今日已传 <span id="photo-count">{{ photos|length }}</span>/{{ max_daily_photos }} 张</p>
+  <div id="photo-filmstrip" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;">
+    {% for p in photos %}
+    <div class="photo-thumb" data-photo-id="{{ p.id }}" style="flex:0 0 auto;width:88px;">
+      <div style="position:relative;">
+        <a href="/attendance/{{ team.id }}/{{ year }}/{{ month }}/{{ day }}/photo/{{ p.id }}/file" target="_blank" rel="noopener">
+          <img src="/attendance/{{ team.id }}/{{ year }}/{{ month }}/{{ day }}/photo/{{ p.id }}/file" alt="合照"
+               style="width:88px;height:88px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block;" />
+        </a>
+        <button type="button" class="photo-delete-btn" data-photo-id="{{ p.id }}" aria-label="删除这张照片"
+                style="position:absolute;top:3px;right:3px;width:20px;height:20px;padding:0;border-radius:50%;background:rgba(34,31,28,.6);color:#fff;border:none;font-size:13px;line-height:1;cursor:pointer;">&times;</button>
+      </div>
+      <p class="muted" style="font-size:11px;text-align:center;margin:4px 0 0;">{{ p.uploaded_at.strftime('%H:%M') }}</p>
+      {% if p.drive_status.value == "failed" %}
+      <button type="button" class="small ghost photo-retry-btn" data-photo-id="{{ p.id }}" style="width:100%;margin-top:2px;font-size:10px;padding:2px 4px;">重试同步</button>
+      {% elif p.drive_status.value == "pending" %}
+      <p class="muted" style="font-size:10px;text-align:center;margin:2px 0 0;">待同步</p>
+      {% endif %}
     </div>
-    <button type="submit">{{ "重新上传合照" if photo else "上传合照" }}</button>
-    {% if photo %}
-    <button type="button" class="ghost" id="delete-photo-btn" style="border-color:var(--rust);color:var(--rust);">删除合照</button>
+    {% endfor %}
+    {% if photos|length < max_daily_photos %}
+    <div style="flex:0 0 auto;">
+      <label for="photo-input" style="display:flex;align-items:center;justify-content:center;width:88px;height:88px;border:1.5px dashed var(--line-strong);border-radius:8px;cursor:pointer;color:var(--accent);font-size:26px;">+</label>
+    </div>
     {% endif %}
+  </div>
+  <form id="photo-form" enctype="multipart/form-data" style="display:none;">
+    <input type="file" id="photo-input" name="photo" accept="image/*" capture="environment" />
   </form>
+  <p class="muted" id="photo-upload-status" style="display:none;margin-top:8px;"></p>
 </div>
 
 <div class="card">

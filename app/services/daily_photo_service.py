@@ -1,17 +1,34 @@
 from pathlib import Path
 
 from fastapi import UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import DailyTeamPhoto, DriveSyncStatus
 from app.services import cos_service
 from app.services.file_storage import resolve_path, save_daily_photo
 
+MAX_DAILY_PHOTOS = 6
 
-def get_daily_photo(db: Session, team_id: int, year: int, month: int, day: int) -> DailyTeamPhoto | None:
+
+def get_daily_photos(db: Session, team_id: int, year: int, month: int, day: int) -> list[DailyTeamPhoto]:
+    return list(
+        db.scalars(
+            select(DailyTeamPhoto)
+            .where(
+                DailyTeamPhoto.team_id == team_id,
+                DailyTeamPhoto.year == year,
+                DailyTeamPhoto.month == month,
+                DailyTeamPhoto.day == day,
+            )
+            .order_by(DailyTeamPhoto.uploaded_at)
+        )
+    )
+
+
+def count_daily_photos(db: Session, team_id: int, year: int, month: int, day: int) -> int:
     return db.scalar(
-        select(DailyTeamPhoto).where(
+        select(func.count()).select_from(DailyTeamPhoto).where(
             DailyTeamPhoto.team_id == team_id,
             DailyTeamPhoto.year == year,
             DailyTeamPhoto.month == month,
@@ -20,29 +37,23 @@ def get_daily_photo(db: Session, team_id: int, year: int, month: int, day: int) 
     )
 
 
+def get_photo_by_id(db: Session, photo_id: int) -> DailyTeamPhoto | None:
+    return db.get(DailyTeamPhoto, photo_id)
+
+
 def upload_daily_photo(
     db: Session, team_id: int, year: int, month: int, day: int, upload: UploadFile, uploaded_by: int
 ) -> DailyTeamPhoto:
+    """Always adds a new photo — a day can hold up to MAX_DAILY_PHOTOS of
+    them (clock-in, clock-out, overtime clock-in/out, whichever subset
+    actually got photographed, in no fixed order), so this never replaces an
+    existing one the way a single-photo-per-day design would. Callers must
+    check count_daily_photos() against MAX_DAILY_PHOTOS before calling this —
+    enforced in the router so the cap produces a friendly error, not a
+    silent 7th photo."""
     rel_path = save_daily_photo(team_id, year, month, day, upload)
-
-    photo = get_daily_photo(db, team_id, year, month, day)
-    if photo is None:
-        photo = DailyTeamPhoto(team_id=team_id, year=year, month=month, day=day, local_path=rel_path, uploaded_by=uploaded_by)
-        db.add(photo)
-    else:
-        # Replacing an already-synced photo — clean up the old remote copy
-        # first (best-effort) so replacing never leaves an orphaned object
-        # sitting in COS forever under the old photo's key.
-        if photo.drive_file_id:
-            try:
-                cos_service.delete_file(photo.drive_file_id)
-            except Exception:  # noqa: BLE001 — replacing the photo must succeed even if the old remote copy can't be cleaned up
-                pass
-        photo.local_path = rel_path
-        photo.uploaded_by = uploaded_by
-        photo.drive_file_id = None
-        photo.drive_status = DriveSyncStatus.pending
-        photo.drive_error = None
+    photo = DailyTeamPhoto(team_id=team_id, year=year, month=month, day=day, local_path=rel_path, uploaded_by=uploaded_by)
+    db.add(photo)
     db.flush()
 
     try_sync_to_drive(db, photo)
@@ -82,7 +93,10 @@ def try_sync_to_drive(db: Session, photo: DailyTeamPhoto) -> None:
         photo.drive_error = None
         return
     local_path: Path = resolve_path(photo.local_path)
-    object_key = f"daily_photos/{photo.team_id}_{photo.year}-{photo.month:02d}-{photo.day:02d}{local_path.suffix}"
+    # Reuses the local filename's own unique stem (it already has a random
+    # suffix per photo, see file_storage.save_daily_photo) so multiple
+    # photos from the same day never collide on the same COS object key.
+    object_key = f"daily_photos/{local_path.name}"
     try:
         file_key = cos_service.upload_file(local_path, object_key)
         photo.drive_file_id = file_key

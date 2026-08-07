@@ -1,4 +1,5 @@
 import shutil
+import uuid
 from io import BytesIO
 from pathlib import Path
 
@@ -48,7 +49,11 @@ def save_avatar(employee_id: int, upload: UploadFile) -> str:
 
 
 def save_daily_photo(team_id: int, year: int, month: int, day: int, upload: UploadFile) -> str:
-    return _write(f"daily_photos/{team_id}_{year}_{month:02d}_{day:02d}.jpg", upload)
+    # A day can now hold several photos, so the filename needs a unique
+    # suffix per upload — reusing the same path would silently overwrite an
+    # earlier photo from the same day on disk.
+    suffix = uuid.uuid4().hex[:8]
+    return _write(f"daily_photos/{team_id}_{year}_{month:02d}_{day:02d}_{suffix}.jpg", upload)
 
 
 def resolve_path(rel_path: str) -> Path:

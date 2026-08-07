@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -15,11 +15,16 @@ class DriveSyncStatus(str, enum.Enum):
 
 
 class DailyTeamPhoto(Base):
-    """One group photo per team per day — a manual headcount/anti-fraud check."""
+    """Group photos for a team on a given day — a manual headcount/anti-fraud
+    check. More than one per day is allowed and expected (clock-in, clock-out,
+    overtime clock-in/out — whichever subset actually got photographed that
+    day, in no fixed order), up to MAX_DAILY_PHOTOS enforced by the service
+    layer, so there is deliberately no uniqueness constraint on
+    (team_id, year, month, day) here — just a plain index for lookup."""
 
     __tablename__ = "daily_team_photos"
     __table_args__ = (
-        UniqueConstraint("team_id", "year", "month", "day", name="uq_daily_photo_team_day"),
+        Index("ix_daily_photo_team_day", "team_id", "year", "month", "day"),
         CheckConstraint("month BETWEEN 1 AND 12", name="chk_photo_month"),
         CheckConstraint("day BETWEEN 1 AND 31", name="chk_photo_day"),
     )

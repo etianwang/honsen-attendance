@@ -21,7 +21,15 @@ from app.services.attendance_service import (
     shift_day,
     sync_employee_status_from_entry,
 )
-from app.services.daily_photo_service import delete_daily_photo, get_daily_photo, try_sync_to_drive, upload_daily_photo
+from app.services.daily_photo_service import (
+    MAX_DAILY_PHOTOS,
+    count_daily_photos,
+    delete_daily_photo,
+    get_daily_photos,
+    get_photo_by_id,
+    try_sync_to_drive,
+    upload_daily_photo,
+)
 from app.services.file_storage import resolve_path
 from app.services.idempotency import claim_idempotency_key
 from app.services.roster_service import get_roster
@@ -50,6 +58,16 @@ class IndividualEditRequest(BaseModel):
 
 def _roster_employee_ids(db: Session, team_id: int, year: int, month: int) -> set[int]:
     return {r.employee_id for r in get_roster(db, team_id, year, month)}
+
+
+def _get_scoped_photo(db: Session, team_id: int, year: int, month: int, day: int, photo_id: int):
+    """Fetch a photo by id and confirm it actually belongs to this
+    team/day — without this a team lead could guess another team's photo_id
+    and retry-sync/delete/view it."""
+    photo = get_photo_by_id(db, photo_id)
+    if photo is None or (photo.team_id, photo.year, photo.month, photo.day) != (team_id, year, month, day):
+        raise HTTPException(status_code=404, detail="找不到这张照片")
+    return photo
 
 
 @router.get("/attendance/{team_id}/{year}/{month}/{day}")
@@ -93,7 +111,7 @@ def attendance_day_page(
 
     py, pmn, pd = shift_day(year, month, day, -1)
     ny, nmn, nd = shift_day(year, month, day, 1)
-    photo = get_daily_photo(db, team_id, year, month, day)
+    photos = get_daily_photos(db, team_id, year, month, day)
 
     return templates.TemplateResponse(
         request,
@@ -109,7 +127,8 @@ def attendance_day_page(
             "values": values_json,
             "prev": {"year": py, "month": pmn, "day": pd},
             "next": {"year": ny, "month": nmn, "day": nd},
-            "photo": photo,
+            "photos": photos,
+            "max_daily_photos": MAX_DAILY_PHOTOS,
         },
     )
 
@@ -124,55 +143,54 @@ def attendance_upload_photo(
     user: User = Depends(require_team_scope),
     db: Session = Depends(get_db),
 ):
+    if count_daily_photos(db, team_id, year, month, day) >= MAX_DAILY_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"今天最多只能传{MAX_DAILY_PHOTOS}张合照")
     upload_daily_photo(db, team_id, year, month, day, photo, uploaded_by=user.id)
     return {"status": "ok"}
 
 
-@router.post("/attendance/{team_id}/{year}/{month}/{day}/photo/retry-sync")
+@router.post("/attendance/{team_id}/{year}/{month}/{day}/photo/{photo_id}/retry-sync")
 def attendance_retry_photo_sync(
     team_id: int,
     year: int,
     month: int,
     day: int,
+    photo_id: int,
     user: User = Depends(require_team_scope),
     db: Session = Depends(get_db),
 ):
-    photo = get_daily_photo(db, team_id, year, month, day)
-    if photo is None:
-        raise HTTPException(status_code=404, detail="这天还没有合照")
+    photo = _get_scoped_photo(db, team_id, year, month, day, photo_id)
     try_sync_to_drive(db, photo)
     db.commit()
     return {"status": "ok", "drive_status": photo.drive_status.value}
 
 
-@router.post("/attendance/{team_id}/{year}/{month}/{day}/photo/delete")
+@router.post("/attendance/{team_id}/{year}/{month}/{day}/photo/{photo_id}/delete")
 def attendance_delete_photo(
     team_id: int,
     year: int,
     month: int,
     day: int,
+    photo_id: int,
     user: User = Depends(require_team_scope),
     db: Session = Depends(get_db),
 ):
-    photo = get_daily_photo(db, team_id, year, month, day)
-    if photo is None:
-        raise HTTPException(status_code=404, detail="这天还没有合照")
+    photo = _get_scoped_photo(db, team_id, year, month, day, photo_id)
     warning = delete_daily_photo(db, photo)
     return {"status": "ok", "warning": warning}
 
 
-@router.get("/attendance/{team_id}/{year}/{month}/{day}/photo-file")
+@router.get("/attendance/{team_id}/{year}/{month}/{day}/photo/{photo_id}/file")
 def attendance_photo_file(
     team_id: int,
     year: int,
     month: int,
     day: int,
+    photo_id: int,
     user: User = Depends(require_team_scope),
     db: Session = Depends(get_db),
 ):
-    photo = get_daily_photo(db, team_id, year, month, day)
-    if photo is None:
-        raise HTTPException(status_code=404, detail="这天还没有合照")
+    photo = _get_scoped_photo(db, team_id, year, month, day, photo_id)
     path = resolve_path(photo.local_path)
     if not path.exists():
         raise HTTPException(status_code=404, detail="文件不存在")

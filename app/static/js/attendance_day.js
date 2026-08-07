@@ -355,49 +355,54 @@
     });
   }
 
-  // ---- daily group photo ----
+  // ---- daily group photos (up to MAX per day, no fixed clock-in/out slots —
+  // each upload just adds one more to the filmstrip, in whatever order they
+  // actually get taken that day) ----
   const photoBase = CTX.apiBase;
-  const photoForm = document.getElementById("photo-form");
-  if (photoForm) {
-    photoForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const input = document.getElementById("photo-input");
-      if (!input.files[0]) return;
+  const photoInput = document.getElementById("photo-input");
+  const photoUploadStatus = document.getElementById("photo-upload-status");
+
+  if (photoInput) {
+    photoInput.addEventListener("change", async () => {
+      if (!photoInput.files[0]) return;
       const fd = new FormData();
-      fd.append("photo", input.files[0]);
-      const statusEl = document.getElementById("photo-status");
-      statusEl.textContent = "上传中…";
+      fd.append("photo", photoInput.files[0]);
+      photoUploadStatus.style.display = "";
+      photoUploadStatus.textContent = "上传中…";
       try {
         const resp = await fetch(`${photoBase}/photo`, { method: "POST", body: fd });
-        if (!resp.ok) throw new Error("http " + resp.status);
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.detail || "http " + resp.status);
+        }
         location.reload();
       } catch (err) {
-        statusEl.textContent = "上传失败，请检查网络后重试";
+        photoUploadStatus.textContent = "上传失败：" + err.message;
+        photoInput.value = "";
       }
     });
   }
 
-  const retryBtn = document.getElementById("retry-sync-btn");
-  if (retryBtn) {
-    retryBtn.addEventListener("click", async () => {
-      retryBtn.textContent = "同步中…";
-      retryBtn.disabled = true;
+  document.querySelectorAll(".photo-retry-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const photoId = btn.dataset.photoId;
+      btn.textContent = "同步中…";
+      btn.disabled = true;
       try {
-        await fetch(`${photoBase}/photo/retry-sync`, { method: "POST" });
+        await fetch(`${photoBase}/photo/${photoId}/retry-sync`, { method: "POST" });
       } finally {
         location.reload();
       }
     });
-  }
+  });
 
-  const deletePhotoBtn = document.getElementById("delete-photo-btn");
-  if (deletePhotoBtn) {
-    deletePhotoBtn.addEventListener("click", async () => {
-      if (!confirm("确定要删除今天的合照吗？")) return;
-      deletePhotoBtn.textContent = "删除中…";
-      deletePhotoBtn.disabled = true;
+  document.querySelectorAll(".photo-delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("确定要删除这张照片吗？")) return;
+      const photoId = btn.dataset.photoId;
+      btn.disabled = true;
       try {
-        const resp = await fetch(`${photoBase}/photo/delete`, { method: "POST" });
+        const resp = await fetch(`${photoBase}/photo/${photoId}/delete`, { method: "POST" });
         if (!resp.ok) throw new Error("http " + resp.status);
         const data = await resp.json();
         if (data.warning) alert(data.warning);
@@ -407,5 +412,5 @@
         location.reload();
       }
     });
-  }
+  });
 })();
