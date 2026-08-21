@@ -28,7 +28,7 @@
     {% for p in photos %}
     <div class="photo-thumb" data-photo-id="{{ p.id }}" style="flex:0 0 auto;width:88px;">
       <div style="position:relative;">
-        <a href="/attendance/{{ team.id }}/{{ year }}/{{ month }}/{{ day }}/photo/{{ p.id }}/file" target="_blank" rel="noopener">
+        <a href="/attendance/{{ team.id }}/{{ year }}/{{ month }}/{{ day }}/photo/{{ p.id }}/file" class="photo-preview-link">
           <img src="/attendance/{{ team.id }}/{{ year }}/{{ month }}/{{ day }}/photo/{{ p.id }}/file" alt="合照"
                style="width:88px;height:88px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block;" />
         </a>
@@ -116,6 +116,12 @@
     </tbody>
   </table>
   </div>
+</div>
+
+<div id="photo-preview-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:60; align-items:center; justify-content:center;">
+  <button type="button" id="photo-preview-close" aria-label="关闭"
+          style="position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;font-size:22px;line-height:1;cursor:pointer;">&times;</button>
+  <img id="photo-preview-img" src="" alt="合照预览" style="max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;" />
 </div>
 
 <div id="edit-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:50; align-items:center; justify-content:center;">

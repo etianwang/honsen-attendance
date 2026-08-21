@@ -413,4 +413,35 @@
       }
     });
   });
+
+  const previewModal = document.getElementById("photo-preview-modal");
+  const previewImg = document.getElementById("photo-preview-img");
+  const previewClose = document.getElementById("photo-preview-close");
+
+  function openPhotoPreview(url) {
+    previewImg.src = url;
+    previewModal.style.display = "flex";
+  }
+  function closePhotoPreview() {
+    previewModal.style.display = "none";
+    previewImg.src = "";
+  }
+
+  document.querySelectorAll(".photo-preview-link").forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      openPhotoPreview(link.href);
+    });
+  });
+  if (previewClose) previewClose.addEventListener("click", closePhotoPreview);
+  if (previewModal) {
+    previewModal.addEventListener("click", (e) => {
+      if (e.target === previewModal) closePhotoPreview();
+    });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && previewModal && previewModal.style.display !== "none") {
+      closePhotoPreview();
+    }
+  });
 })();
