@@ -34,7 +34,7 @@ class RevalidatingStaticFiles(StaticFiles):
         return response
 
 
-app = FastAPI(title="喀麦隆考勤系统")
+app = FastAPI(title="埃塞俄比亚考勤系统")
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key, same_site="lax")
 app.mount("/static", RevalidatingStaticFiles(directory="app/static"), name="static")
 
