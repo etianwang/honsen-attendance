@@ -8,9 +8,9 @@ Web 版考勤登记系统，给埃塞俄比亚项目部用，替代 Excel 手工
    ```bash
    docker run -d --name honsen-attendance-pg \
      -e POSTGRES_USER=attendance -e POSTGRES_PASSWORD=attendance -e POSTGRES_DB=attendance \
-     -p 5433:5432 postgres:16-alpine
+     -p 5432:5432 postgres:16-alpine
    ```
-   注意：本机 5432 端口已经被一个已有的 PostgreSQL 服务占用，所以这里映射到了 **5433**。
+   如果本机 5432 已被占用，可改成 `-p 5433:5432`，并把 `.env` 的端口也改成 5433。
 
 2. 建虚拟环境、装依赖：
    ```bash
@@ -18,7 +18,7 @@ Web 版考勤登记系统，给埃塞俄比亚项目部用，替代 Excel 手工
    ./.venv/Scripts/python.exe -m pip install -r requirements.txt
    ```
 
-3. 复制 `.env.example` 为 `.env`（默认已经指向 5433 端口的本地库，一般不用改；Google Drive 那两行先留空也没关系，看下面第 6 节）。
+3. 复制 `.env.example` 为 `.env`（默认指向本机 PostgreSQL 的 5432 端口；Google Drive 那两行先留空也没关系，看下面第 6 节）。
 
 4. 建表：
    ```bash
@@ -91,9 +91,74 @@ Web 版考勤登记系统，给埃塞俄比亚项目部用，替代 Excel 手工
 
 8. 重启一下服务（`uvicorn`）让新的环境变量生效，上传一张合照试试，应该会看到"已同步到 Google Drive"。
 
-## 上线到生产 Postgres
+## Ubuntu 生产部署
 
-把 `.env` 里的 `DATABASE_URL` 换成生产库的连接字符串，跑一次 `alembic upgrade head` 建表即可，代码不需要改。生产部署（选哪个云 Postgres、怎么托管这个 Web 应用）留给后续步骤决定。
+以下流程适用于 Ubuntu 服务器上的 `/www/wwwroot/attendance-et`。同一服务器部署多个项目时，**每个项目必须使用独立数据库**；本项目使用 `attendance_et`。
+
+1. 安装 PostgreSQL、Git 和 Python 虚拟环境支持：
+   ```bash
+   apt update
+   apt install -y postgresql git python3-venv
+   systemctl enable --now postgresql
+   ```
+
+2. 创建应用数据库和账号。已有 `attendance` 账号时跳过第一条：
+   ```bash
+   sudo -u postgres psql
+   ```
+   ```sql
+   CREATE USER attendance WITH PASSWORD '换成强密码';
+   CREATE DATABASE attendance_et OWNER attendance;
+   \q
+   ```
+
+3. 拉取代码并安装依赖：
+   ```bash
+   cd /www/wwwroot
+   git clone https://github.com/etianwang/honsen-attendance.git attendance-et
+   cd attendance-et
+   python3 -m venv .venv
+   .venv/bin/pip install -r requirements.txt
+   ```
+
+4. 创建生产配置：
+   ```bash
+   cp .env.example .env
+   nano .env
+   ```
+   至少修改为：
+   ```env
+   DATABASE_URL=postgresql+psycopg://attendance:换成强密码@127.0.0.1:5432/attendance_et
+   SECRET_KEY=换成随机长字符串
+   UPLOAD_DIR=uploads
+   ```
+   如需每日合照同步到腾讯云 COS，再填写 `COS_SECRET_ID`、`COS_SECRET_KEY`、`COS_BUCKET` 和 `COS_REGION`。
+
+5. 初始化表结构和埃塞俄比亚项目数据：
+   ```bash
+   .venv/bin/python -m alembic upgrade head
+   .venv/bin/python -m seed.seed_ethiopia
+   ```
+   种子脚本会创建“埃塞酒店团队”、万豪酒店，以及 `admin` 和 `lifan` 账号；终端会打印随机初始密码。只在新数据库执行一次。
+
+6. 临时启动验证：
+   ```bash
+   .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8010
+   ```
+   生产环境应由 systemd 或服务器面板守护该命令，并通过 Nginx/Caddy 反向代理到 8010；PostgreSQL 的 5432 端口只保留本机访问，不要开放到公网。
+
+7. 后续更新：
+   ```bash
+   cd /www/wwwroot/attendance-et
+   git pull --ff-only
+   .venv/bin/pip install -r requirements.txt
+   .venv/bin/python -m alembic upgrade head
+   ```
+   若 Git 提示 `dubious ownership`，确认目录确实是本项目后执行一次：
+   ```bash
+   git config --global --add safe.directory /www/wwwroot/attendance-et
+   ```
+   最后重启应用服务。
 
 ## 目录结构
 

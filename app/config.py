@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+psycopg://attendance:attendance@localhost:5433/attendance"
+    database_url: str = "postgresql+psycopg://attendance:attendance@127.0.0.1:5432/attendance"
     secret_key: str = "change-me-to-a-random-secret"
 
     upload_dir: str = "uploads"
