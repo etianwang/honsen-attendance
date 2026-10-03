@@ -8,7 +8,7 @@ from app.models import DailyTeamPhoto, DriveSyncStatus
 from app.services import cos_service
 from app.services.file_storage import resolve_path, save_daily_photo
 
-MAX_DAILY_PHOTOS = 6
+MAX_DAILY_PHOTOS = 10
 
 
 def get_daily_photos(db: Session, team_id: int, year: int, month: int, day: int) -> list[DailyTeamPhoto]:
