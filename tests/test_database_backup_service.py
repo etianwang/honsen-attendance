@@ -1,5 +1,7 @@
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+from app.services import database_backup_service
 from app.services.database_backup_service import pg_dump_command, pg_restore_command
 
 
@@ -25,3 +27,14 @@ def test_restore_command_overwrites_data_without_exposing_password():
     assert command[-2] == "postgresql://attendance@db.example:5432/attendance"
     assert "secret" not in " ".join(command)
     assert environment["PGPASSWORD"] == "secret"
+
+
+def test_baota_postgres_tool_is_used_when_not_on_path():
+    tool = MagicMock()
+    tool.is_file.return_value = True
+    tool.__str__.return_value = "/www/server/pgsql/bin/pg_dump"
+    with patch.object(database_backup_service.shutil, "which", return_value=None), patch.object(
+        database_backup_service.os, "name", "posix"
+    ), patch.object(database_backup_service, "Path") as path:
+        path.return_value.__truediv__.return_value = tool
+        assert database_backup_service._postgres_tool("pg_dump") == "/www/server/pgsql/bin/pg_dump"
