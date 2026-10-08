@@ -28,6 +28,8 @@ def dashboard(request: Request, user: User = Depends(get_current_user), db: Sess
             "dashboard_admin.html",
             {"user": user, "active_nav": "dashboard", "teams": teams, "today": today},
         )
+    if user.role == UserRole.auditor:
+        return RedirectResponse(url="/admin/stats", status_code=303)
     return RedirectResponse(
         url=f"/attendance/{user.team_id}/{today.year}/{today.month}/{today.day}", status_code=303
     )

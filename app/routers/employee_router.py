@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user, require_admin, require_employee_scope
+from app.auth.dependencies import get_current_user, require_admin, require_employee_edit_scope, require_employee_scope, require_stats_access
 from app.auth.security import verify_password
 from app.database import get_db
 from app.models import Employee, EmployeeStatus, User
@@ -23,7 +23,7 @@ BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "不详"]
 def admin_employee_directory(
     request: Request,
     q: str | None = None,
-    user: User = Depends(require_admin),
+    user: User = Depends(require_stats_access),
     db: Session = Depends(get_db),
 ):
     """Cross-team employee directory — unlike a team's own 花名册 page (scoped
@@ -60,7 +60,7 @@ def admin_employee_create(
 @router.get("/employee/{employee_id}")
 def employee_profile(
     request: Request,
-    employee: Employee = Depends(require_employee_scope),
+    employee: Employee = Depends(require_employee_edit_scope),
     user: User = Depends(get_current_user),
 ):
     return templates.TemplateResponse(
@@ -79,7 +79,7 @@ def employee_profile_update(
     blood_type: str = Form(""),
     emergency_contact_name: str = Form(""),
     emergency_contact_phone: str = Form(""),
-    employee: Employee = Depends(require_employee_scope),
+    employee: Employee = Depends(require_employee_edit_scope),
     db: Session = Depends(get_db),
 ):
     # employees.id (already stable, never shown/editable) is what every

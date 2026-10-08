@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_admin, require_team_scope
+from app.auth.dependencies import require_stats_access, require_team_scope
 from app.database import get_db
 from app.models import Team, User
 from app.routers.stats_router import resolve_range
@@ -55,7 +55,7 @@ def export_labor_stats(
     half: int | None = None,
     start: str | None = None,
     end: str | None = None,
-    user: User = Depends(require_admin),
+    user: User = Depends(require_stats_access),
     db: Session = Depends(get_db),
 ):
     today = date.today()
@@ -79,7 +79,7 @@ def export_person_stats(
     half: int | None = None,
     start: str | None = None,
     end: str | None = None,
-    user: User = Depends(require_admin),
+    user: User = Depends(require_stats_access),
     db: Session = Depends(get_db),
 ):
     today = date.today()

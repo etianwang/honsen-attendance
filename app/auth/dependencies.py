@@ -26,6 +26,12 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
+def require_stats_access(user: User = Depends(get_current_user)) -> User:
+    if user.role not in (UserRole.admin, UserRole.auditor):
+        raise HTTPException(status_code=403, detail="需要统计查看权限")
+    return user
+
+
 def require_team_scope(team_id: int, user: User = Depends(get_current_user)) -> User:
     """Server-side enforcement: a team_lead can only ever touch their own team_id,
     no matter what the client sends — this is checked on every request, not just
@@ -45,7 +51,7 @@ def require_employee_scope(
     employee = db.get(Employee, employee_id)
     if employee is None:
         raise HTTPException(status_code=404, detail="找不到该员工")
-    if user.role == UserRole.admin:
+    if user.role in (UserRole.admin, UserRole.auditor):
         return employee
     on_team = db.scalar(
         select(MonthlyRoster.id)
@@ -55,3 +61,11 @@ def require_employee_scope(
     if on_team is None:
         raise HTTPException(status_code=403, detail="无权访问该员工信息")
     return employee
+
+
+def require_employee_edit_scope(
+    employee_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> Employee:
+    if user.role == UserRole.auditor:
+        raise HTTPException(status_code=403, detail="审计账号只能查看员工档案")
+    return require_employee_scope(employee_id, user, db)

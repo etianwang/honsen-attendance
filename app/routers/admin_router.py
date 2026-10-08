@@ -1,16 +1,43 @@
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse
+import logging
+import os
+import shutil
+import tempfile
+from datetime import date
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 
 from app.auth.dependencies import require_admin
 from app.auth.security import hash_password
-from app.database import get_db
+from app.database import SessionLocal, engine, get_db
+from app.config import settings
 from app.models import AttendanceValue, Team, User, UserRole, ValueCategory
+from app.services.database_backup_service import create_backup, restore_backup, upgrade_schema
 from app.templates_env import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
+backup_router = APIRouter(prefix="/admin")
+logger = logging.getLogger(__name__)
+
+
+def require_backup_admin(request: Request) -> User:
+    """Authenticates then closes its DB session before pg_restore takes table locks."""
+    user_id = request.session.get("user_id")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="未登录")
+    with SessionLocal() as db:
+        user = db.get(User, user_id)
+        if user is None or not user.is_active:
+            request.session.clear()
+            raise HTTPException(status_code=401, detail="未登录")
+        if user.role != UserRole.admin:
+            raise HTTPException(status_code=403, detail="需要管理员权限")
+        return user
 
 
 @router.get("/settings")
@@ -29,13 +56,64 @@ def admin_settings(
         {
             "user": user,
             "active_nav": "settings",
-            "tab": tab if tab in ("teams", "accounts", "values") else "teams",
+            "tab": tab if tab in ("teams", "accounts", "values", "data") else "teams",
             "teams": teams,
             "users": users,
             "values": values,
             "UserRole": UserRole,
         },
     )
+
+
+@backup_router.get("/backup")
+def download_database_backup(user: User = Depends(require_backup_admin)):
+    """Exports the database only; COS credentials remain on the server."""
+    descriptor, filename = tempfile.mkstemp(prefix="attendance-", suffix=".dump")
+    os.close(descriptor)
+    backup_path = Path(filename)
+    try:
+        create_backup(settings.database_url, backup_path)
+    except Exception:  # noqa: BLE001 - do not reveal connection details to the browser
+        backup_path.unlink(missing_ok=True)
+        logger.exception("Database backup failed")
+        raise HTTPException(status_code=503, detail="数据库备份失败，请确认服务器已安装 pg_dump 且数据库可访问。")
+    return FileResponse(
+        backup_path,
+        media_type="application/octet-stream",
+        filename=f"attendance-{date.today():%Y%m%d}.dump",
+        background=BackgroundTask(backup_path.unlink, missing_ok=True),
+    )
+
+
+@backup_router.post("/backup/restore")
+async def restore_database_backup(
+    request: Request,
+    backup: UploadFile = File(...),
+    confirmation: str = Form(...),
+    user: User = Depends(require_backup_admin),
+):
+    if confirmation.strip() != "恢复":
+        return RedirectResponse(url="/admin/settings?tab=data&err=请输入恢复以确认覆盖当前数据", status_code=303)
+    if not (backup.filename or "").lower().endswith(".dump"):
+        return RedirectResponse(url="/admin/settings?tab=data&err=请选择下载的.dump备份文件", status_code=303)
+
+    descriptor, filename = tempfile.mkstemp(prefix="attendance-restore-", suffix=".dump")
+    os.close(descriptor)
+    backup_path = Path(filename)
+    try:
+        with backup_path.open("wb") as file:
+            shutil.copyfileobj(backup.file, file)
+        engine.dispose()
+        restore_backup(settings.database_url, backup_path)
+        upgrade_schema()
+    except Exception:  # noqa: BLE001 - do not reveal connection details to the browser
+        logger.exception("Database restore failed")
+        return RedirectResponse(url="/admin/settings?tab=data&err=恢复失败，当前数据库可能未完整恢复，请联系管理员", status_code=303)
+    finally:
+        backup_path.unlink(missing_ok=True)
+        await backup.close()
+    request.session.clear()
+    return RedirectResponse(url="/login?ok=数据库已恢复，请重新登录", status_code=303)
 
 
 @router.post("/teams/add")
@@ -89,7 +167,9 @@ def admin_users_add(
     username = username.strip()
     if db.scalar(select(User).where(User.username == username)):
         return RedirectResponse(url="/admin/settings?tab=accounts&err=账号已存在", status_code=303)
-    user_role = UserRole.admin if role == "admin" else UserRole.team_lead
+    if role not in ("admin", "team_lead", "auditor"):
+        return RedirectResponse(url="/admin/settings?tab=accounts&err=无效的账号角色", status_code=303)
+    user_role = UserRole(role)
     if user_role == UserRole.team_lead and not team_id:
         return RedirectResponse(url="/admin/settings?tab=accounts&err=班组长账号必须选择所属班组", status_code=303)
     db.add(
@@ -98,7 +178,7 @@ def admin_users_add(
             password_hash=hash_password(password),
             display_name=display_name.strip(),
             role=user_role,
-            team_id=int(team_id) if (user_role == UserRole.team_lead and team_id) else None,
+            team_id=int(team_id) if user_role == UserRole.team_lead else None,
         )
     )
     db.commit()

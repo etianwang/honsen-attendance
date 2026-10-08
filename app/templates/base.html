@@ -22,7 +22,7 @@
 
   <div class="app-shell">
     {% if user %}
-    {% set who_text = user.display_name + " · " + ("管理员" if user.role.value == "admin" else (user.team.name + " 班组长")) %}
+    {% set who_text = user.display_name + " · " + ("管理员" if user.role.value == "admin" else ("审计/统计" if user.role.value == "auditor" else user.team.name + " 班组长")) %}
 
     <header class="mobile-topbar">
       <div>
@@ -39,6 +39,10 @@
         <a href="/admin/employees" class="rail-link {{ 'active' if active_nav == 'employees' }}" title="员工管理">{{ icon_person() }}</a>
         <a href="/admin/stats" class="rail-link {{ 'active' if active_nav == 'stats' }}" title="统计">{{ icon_chart() }}</a>
         <a href="/admin/settings" class="rail-link {{ 'active' if active_nav == 'settings' }}" title="设置">{{ icon_gear() }}</a>
+      {% elif user.role.value == "auditor" %}
+        <a href="/admin/stats" class="rail-link {{ 'active' if active_nav == 'stats' }}" title="统计">{{ icon_chart() }}</a>
+        <a href="/admin/employees" class="rail-link {{ 'active' if active_nav == 'employees' }}" title="员工花名册">{{ icon_person() }}</a>
+        <a href="/account/password" class="rail-link {{ 'active' if active_nav == 'account' }}" title="修改密码">{{ icon_gear() }}</a>
       {% else %}
         <a href="/dashboard" class="rail-link {{ 'active' if active_nav == 'dashboard' }}" title="今日录入">{{ icon_calendar() }}</a>
         <a href="/roster/{{ user.team_id }}" class="rail-link {{ 'active' if active_nav == 'roster' }}" title="花名册">{{ icon_list() }}</a>
@@ -52,6 +56,10 @@
         <a href="/admin/employees" class="tab-link {{ 'active' if active_nav == 'employees' }}">{{ icon_person() }}<span>员工</span></a>
         <a href="/admin/stats" class="tab-link {{ 'active' if active_nav == 'stats' }}">{{ icon_chart() }}<span>统计</span></a>
         <a href="/admin/settings" class="tab-link {{ 'active' if active_nav == 'settings' }}">{{ icon_gear() }}<span>设置</span></a>
+      {% elif user.role.value == "auditor" %}
+        <a href="/admin/stats" class="tab-link {{ 'active' if active_nav == 'stats' }}">{{ icon_chart() }}<span>统计</span></a>
+        <a href="/admin/employees" class="tab-link {{ 'active' if active_nav == 'employees' }}">{{ icon_person() }}<span>花名册</span></a>
+        <a href="/account/password" class="tab-link {{ 'active' if active_nav == 'account' }}">{{ icon_gear() }}<span>密码</span></a>
       {% else %}
         <a href="/dashboard" class="tab-link {{ 'active' if active_nav == 'dashboard' }}">{{ icon_calendar() }}<span>今日录入</span></a>
         <a href="/roster/{{ user.team_id }}" class="tab-link {{ 'active' if active_nav == 'roster' }}">{{ icon_list() }}<span>花名册</span></a>

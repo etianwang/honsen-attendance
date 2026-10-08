@@ -10,6 +10,7 @@ from app.config import settings
 from app.routers import (
     admin_attendance_router,
     admin_router,
+    account_router,
     attendance_router,
     auth_router,
     dashboard_router,
@@ -48,11 +49,13 @@ async def http_exception_handler(request: Request, exc: FastAPIHTTPException):
 
 
 app.include_router(auth_router.router)
+app.include_router(account_router.router)
 app.include_router(dashboard_router.router)
 app.include_router(roster_router.router)
 app.include_router(employee_router.router)
 app.include_router(admin_attendance_router.router)
 app.include_router(attendance_router.router)
 app.include_router(admin_router.router)
+app.include_router(admin_router.backup_router)
 app.include_router(stats_router.router)
 app.include_router(export_router.router)

@@ -4,6 +4,7 @@
 <h1>员工管理</h1>
 <p class="muted">全公司所有员工，不分班组。"当前班组"是本月的花名册状态；一个人同时在多个班组时会都列出来，没在任何花名册里的显示"—"。</p>
 
+{% if user.role.value == "admin" %}
 <div class="card">
   <h2>新增员工</h2>
   <form method="post" action="/admin/employees/add" class="grid-2" style="align-items:end;">
@@ -11,6 +12,7 @@
     <div><button type="submit">创建</button></div>
   </form>
 </div>
+{% endif %}
 
 <div class="card">
   <form method="get" action="/admin/employees" class="grid-2" style="align-items:end;">

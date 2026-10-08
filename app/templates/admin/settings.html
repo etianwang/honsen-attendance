@@ -8,6 +8,27 @@
     <button type="button" class="tab-btn {{ 'active' if tab == 'teams' }}" data-tab="teams" style="flex:1;border-radius:0;background:none;color:{{ 'var(--ink)' if tab == 'teams' else 'var(--ink-soft)' }};font-weight:700;padding:12px;">班组</button>
     <button type="button" class="tab-btn {{ 'active' if tab == 'accounts' }}" data-tab="accounts" style="flex:1;border-radius:0;background:none;color:{{ 'var(--ink)' if tab == 'accounts' else 'var(--ink-soft)' }};font-weight:700;padding:12px;">账号</button>
     <button type="button" class="tab-btn {{ 'active' if tab == 'values' }}" data-tab="values" style="flex:1;border-radius:0;background:none;color:{{ 'var(--ink)' if tab == 'values' else 'var(--ink-soft)' }};font-weight:700;padding:12px;">上/下午可选值</button>
+    <button type="button" class="tab-btn {{ 'active' if tab == 'data' }}" data-tab="data" style="flex:1;border-radius:0;background:none;color:{{ 'var(--ink)' if tab == 'data' else 'var(--ink-soft)' }};font-weight:700;padding:12px;">迁移备份</button>
+  </div>
+</div>
+
+<div class="tab-panel" data-panel="data" style="{{ '' if tab == 'data' else 'display:none;' }}">
+  <div class="card">
+    <h2>迁移备份</h2>
+    <p class="muted">下载的是完整 PostgreSQL 数据库备份，含所有考勤、账号和 COS 图片对象键；不含 COS 密钥。迁移后把原服务器的 COS_* 配置复制到新服务器，云端照片即可继续关联。</p>
+    <a class="btn" href="/admin/backup">下载数据库备份（.dump）</a>
+    <p class="muted" style="margin-top:12px;">恢复会完全覆盖当前数据库并自动更新表结构。头像只在本地保存，还需复制 <code>uploads/avatars/</code>；已同步的每日合照无需复制。</p>
+  </div>
+  <div class="card">
+    <h2>导入数据库备份</h2>
+    <p class="muted">仅导入由本系统下载的 <code>.dump</code> 文件。恢复会覆盖当前数据，请在无人录入时操作；成功后会退出登录。</p>
+    <form method="post" action="/admin/backup/restore" enctype="multipart/form-data">
+      <label for="backup-file">备份文件</label>
+      <input id="backup-file" name="backup" type="file" accept=".dump" required />
+      <label for="restore-confirmation">输入“恢复”确认覆盖当前全部数据</label>
+      <input id="restore-confirmation" name="confirmation" type="text" required autocomplete="off" />
+      <button type="submit">恢复备份</button>
+    </form>
   </div>
 </div>
 
@@ -67,6 +88,7 @@
         <select id="role" name="role">
           <option value="team_lead">班组长</option>
           <option value="admin">管理员</option>
+          <option value="auditor">审计/统计（只读）</option>
         </select>
       </div>
     </div>
@@ -92,7 +114,7 @@
       <tr>
         <td>{{ u.username }}</td>
         <td>{{ u.display_name }}</td>
-        <td>{{ "管理员" if u.role == UserRole.admin else "班组长" }}</td>
+        <td>{{ "管理员" if u.role == UserRole.admin else ("审计/统计（只读）" if u.role == UserRole.auditor else "班组长") }}</td>
         <td>
           {% if u.role == UserRole.team_lead %}
           <select form="user-team-form-{{ u.id }}" name="team_id" style="margin:0;min-width:120px;">

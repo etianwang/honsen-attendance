@@ -12,13 +12,14 @@ from app.models.team import Team
 class UserRole(str, enum.Enum):
     admin = "admin"
     team_lead = "team_lead"
+    auditor = "auditor"
 
 
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint(
-            "role = 'admin' OR (role = 'team_lead' AND team_id IS NOT NULL)",
+            "(role = 'team_lead' AND team_id IS NOT NULL) OR (role IN ('admin', 'auditor') AND team_id IS NULL)",
             name="chk_team_lead_has_team",
         ),
     )

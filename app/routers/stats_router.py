@@ -3,7 +3,7 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_stats_access
 from app.database import get_db
 from app.models import User
 from app.services.stats import (
@@ -59,7 +59,7 @@ def stats_page(
     half: int | None = None,
     start: str | None = None,
     end: str | None = None,
-    user: User = Depends(require_admin),
+    user: User = Depends(require_stats_access),
     db: Session = Depends(get_db),
 ):
     """工地×班组 and 按人员 are the same underlying query (person_site_team_stats

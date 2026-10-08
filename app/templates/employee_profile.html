@@ -10,15 +10,27 @@
   {% else %}
   <div class="muted" style="margin-bottom:10px;">还没有上传头像</div>
   {% endif %}
+  {% if user.role.value != "auditor" %}
   <form method="post" action="/employee/{{ employee.id }}/avatar" enctype="multipart/form-data">
     <input type="file" name="avatar" accept="image/*" capture="environment" required />
     <button type="submit">上传/更换头像</button>
   </form>
+  {% endif %}
 </div>
 
 <div class="card" style="max-width:360px;">
   <h2>基本信息</h2>
   <p class="muted">员工编号 #{{ employee.id }}（内部固定不变，改名字不会影响他的历史花名册/考勤记录）</p>
+  {% if user.role.value == "auditor" %}
+  <dl>
+    <dt>姓名</dt><dd>{{ employee.full_name }}</dd>
+    <dt>状态</dt><dd>{{ {"active": "在场", "returned": "回国", "suspended": "停工"}[employee.status.value] }}</dd>
+    <dt>电话</dt><dd>{{ employee.phone or "—" }}</dd>
+    <dt>血型</dt><dd>{{ employee.blood_type or "—" }}</dd>
+    <dt>紧急联系人</dt><dd>{{ employee.emergency_contact_name or "—" }}</dd>
+    <dt>紧急联系电话</dt><dd>{{ employee.emergency_contact_phone or "—" }}</dd>
+  </dl>
+  {% else %}
   <form method="post" action="/employee/{{ employee.id }}">
     <label for="full_name">姓名</label>
     <input type="text" id="full_name" name="full_name" value="{{ employee.full_name }}" required />
@@ -49,6 +61,7 @@
 
     <button type="submit">保存</button>
   </form>
+  {% endif %}
 </div>
 
 {% if user.role.value == "admin" %}
@@ -64,5 +77,7 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}
+{% if user.role.value == "admin" %}
 <script src="/static/js/confirm_password.js"></script>
+{% endif %}
 {% endblock %}
