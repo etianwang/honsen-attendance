@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth.dependencies import get_current_user, require_admin, require_employee_edit_scope, require_employee_scope, require_stats_access
 from app.auth.security import verify_password
 from app.database import get_db
-from app.models import DailyTeamPhoto, Employee, EmployeeStatus, User
+from app.models import AttendanceValue, DailyTeamPhoto, Employee, EmployeeStatus, User
+from app.services.attendance_service import get_entries_for_day
 from app.services.file_storage import resolve_path, save_avatar
-from app.services.roster_service import all_employees_with_current_teams
+from app.services.roster_service import all_employees_with_current_teams, get_all_teams_roster
 from app.templates_env import templates
 
 router = APIRouter()
@@ -47,6 +48,27 @@ def audit_daily_photos(
     db: Session = Depends(get_db),
 ):
     selected_date = selected_date or date.today()
+    roster = get_all_teams_roster(db, selected_date.year, selected_date.month)
+    entries = get_entries_for_day(
+        db, [(row.employee_id, row.team_id) for row in roster], selected_date.year, selected_date.month, selected_date.day
+    )
+    value_codes = {value.id: value.code for value in db.scalars(select(AttendanceValue))}
+    attendance_rows = []
+    for row in roster:
+        entry = entries.get((row.employee_id, row.team_id))
+        am = value_codes.get(entry.am_value_id) if entry else None
+        pm = value_codes.get(entry.pm_value_id) if entry else None
+        attendance_rows.append(
+            {
+                "name": row.employee.full_name,
+                "team": row.team.name,
+                "am": am or "未登记",
+                "am_note": entry.am_note if entry else None,
+                "pm": pm or "未登记",
+                "pm_note": entry.pm_note if entry else None,
+                "overtime": entry.evening_overtime if entry else False,
+            }
+        )
     photos = db.scalars(
         select(DailyTeamPhoto)
         .options(joinedload(DailyTeamPhoto.team))
@@ -66,6 +88,7 @@ def audit_daily_photos(
             "selected_date": selected_date,
             "previous_date": selected_date - timedelta(days=1),
             "next_date": selected_date + timedelta(days=1),
+            "attendance_rows": attendance_rows,
             "photos": photos,
         },
     )

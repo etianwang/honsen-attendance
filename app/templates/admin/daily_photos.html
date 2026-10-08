@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}每日照片{% endblock %}
+{% block title %}每日考勤{% endblock %}
 {% block content %}
-<h1>每日照片</h1>
+<h1>每日考勤</h1>
 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
   <a class="btn small ghost" href="/admin/photos?selected_date={{ previous_date.isoformat() }}">&lsaquo; 前一天</a>
   <form method="get" action="/admin/photos" style="display:flex;gap:8px;align-items:center;">
@@ -10,6 +10,30 @@
     <button type="submit" class="small">查看</button>
   </form>
   <a class="btn small ghost" href="/admin/photos?selected_date={{ next_date.isoformat() }}">后一天 &rsaquo;</a>
+</div>
+
+<div class="card">
+  <h2>{{ selected_date.strftime('%Y年%m月%d日') }} 上工情况</h2>
+  {% if attendance_rows %}
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>员工</th><th>班组</th><th>上午（工地/情况）</th><th>下午（工地/情况）</th><th>晚上加班</th></tr></thead>
+      <tbody>
+        {% for row in attendance_rows %}
+        <tr>
+          <td>{{ row.name }}</td>
+          <td>{{ row.team }}</td>
+          <td>{{ row.am }}{{ "（" + row.am_note + "）" if row.am_note }}</td>
+          <td>{{ row.pm }}{{ "（" + row.pm_note + "）" if row.pm_note }}</td>
+          <td>{{ "是" if row.overtime else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">当月还没有花名册。</p>
+  {% endif %}
 </div>
 
 <div class="card">
