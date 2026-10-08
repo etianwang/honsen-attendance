@@ -1,9 +1,11 @@
 import pytest
+from inspect import signature
 from fastapi import HTTPException
 from unittest.mock import Mock
 
 from app.auth.dependencies import require_employee_edit_scope, require_employee_scope, require_stats_access, require_team_scope
 from app.models import Employee, User, UserRole
+from app.routers.employee_router import employee_avatar_upload, employee_profile
 
 
 def test_admin_can_access_any_team():
@@ -43,3 +45,8 @@ def test_auditor_can_view_but_not_edit_employee():
     assert require_employee_scope(employee_id=1, user=auditor, db=db) is employee
     with pytest.raises(HTTPException):
         require_employee_edit_scope(employee_id=1, user=auditor, db=db)
+
+
+def test_employee_profile_and_avatar_use_the_correct_auditor_scopes():
+    assert signature(employee_profile).parameters["employee"].default.dependency is require_employee_scope
+    assert signature(employee_avatar_upload).parameters["employee"].default.dependency is require_employee_edit_scope

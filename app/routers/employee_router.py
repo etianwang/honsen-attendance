@@ -107,7 +107,7 @@ def admin_employee_create(
 @router.get("/employee/{employee_id}")
 def employee_profile(
     request: Request,
-    employee: Employee = Depends(require_employee_edit_scope),
+    employee: Employee = Depends(require_employee_scope),
     user: User = Depends(get_current_user),
 ):
     return templates.TemplateResponse(
@@ -154,7 +154,7 @@ def employee_profile_update(
 def employee_avatar_upload(
     employee_id: int,
     avatar: UploadFile = File(...),
-    employee: Employee = Depends(require_employee_scope),
+    employee: Employee = Depends(require_employee_edit_scope),
     db: Session = Depends(get_db),
 ):
     rel_path = save_avatar(employee_id, avatar)
