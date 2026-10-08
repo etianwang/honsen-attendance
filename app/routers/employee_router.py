@@ -1,15 +1,15 @@
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.auth.dependencies import get_current_user, require_admin, require_employee_edit_scope, require_employee_scope, require_stats_access
 from app.auth.security import verify_password
 from app.database import get_db
-from app.models import Employee, EmployeeStatus, User
+from app.models import DailyTeamPhoto, Employee, EmployeeStatus, User
 from app.services.file_storage import resolve_path, save_avatar
 from app.services.roster_service import all_employees_with_current_teams
 from app.templates_env import templates
@@ -37,6 +37,53 @@ def admin_employee_directory(
         "admin/employees.html",
         {"user": user, "active_nav": "employees", "rows": rows, "q": q or "", "EmployeeStatus": EmployeeStatus},
     )
+
+
+@router.get("/admin/photos")
+def audit_daily_photos(
+    request: Request,
+    selected_date: date | None = None,
+    user: User = Depends(require_stats_access),
+    db: Session = Depends(get_db),
+):
+    selected_date = selected_date or date.today()
+    photos = db.scalars(
+        select(DailyTeamPhoto)
+        .options(joinedload(DailyTeamPhoto.team))
+        .where(
+            DailyTeamPhoto.year == selected_date.year,
+            DailyTeamPhoto.month == selected_date.month,
+            DailyTeamPhoto.day == selected_date.day,
+        )
+        .order_by(DailyTeamPhoto.team_id, DailyTeamPhoto.uploaded_at)
+    ).all()
+    return templates.TemplateResponse(
+        request,
+        "admin/daily_photos.html",
+        {
+            "user": user,
+            "active_nav": "photos",
+            "selected_date": selected_date,
+            "previous_date": selected_date - timedelta(days=1),
+            "next_date": selected_date + timedelta(days=1),
+            "photos": photos,
+        },
+    )
+
+
+@router.get("/admin/photos/{photo_id}/file")
+def audit_daily_photo_file(
+    photo_id: int,
+    user: User = Depends(require_stats_access),
+    db: Session = Depends(get_db),
+):
+    photo = db.get(DailyTeamPhoto, photo_id)
+    if photo is None:
+        raise HTTPException(status_code=404, detail="找不到这张照片")
+    path = resolve_path(photo.local_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="照片文件不存在")
+    return FileResponse(path)
 
 
 @router.post("/admin/employees/add")

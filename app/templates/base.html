@@ -42,6 +42,7 @@
       {% elif user.role.value == "auditor" %}
         <a href="/admin/stats" class="rail-link {{ 'active' if active_nav == 'stats' }}" title="统计">{{ icon_chart() }}</a>
         <a href="/admin/employees" class="rail-link {{ 'active' if active_nav == 'employees' }}" title="员工花名册">{{ icon_person() }}</a>
+        <a href="/admin/photos" class="rail-link {{ 'active' if active_nav == 'photos' }}" title="每日照片">{{ icon_calendar() }}</a>
         <a href="/account/password" class="rail-link {{ 'active' if active_nav == 'account' }}" title="修改密码">{{ icon_gear() }}</a>
       {% else %}
         <a href="/dashboard" class="rail-link {{ 'active' if active_nav == 'dashboard' }}" title="今日录入">{{ icon_calendar() }}</a>
@@ -59,6 +60,7 @@
       {% elif user.role.value == "auditor" %}
         <a href="/admin/stats" class="tab-link {{ 'active' if active_nav == 'stats' }}">{{ icon_chart() }}<span>统计</span></a>
         <a href="/admin/employees" class="tab-link {{ 'active' if active_nav == 'employees' }}">{{ icon_person() }}<span>花名册</span></a>
+        <a href="/admin/photos" class="tab-link {{ 'active' if active_nav == 'photos' }}">{{ icon_calendar() }}<span>照片</span></a>
         <a href="/account/password" class="tab-link {{ 'active' if active_nav == 'account' }}">{{ icon_gear() }}<span>密码</span></a>
       {% else %}
         <a href="/dashboard" class="tab-link {{ 'active' if active_nav == 'dashboard' }}">{{ icon_calendar() }}<span>今日录入</span></a>

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}每日照片{% endblock %}
+{% block content %}
+<h1>每日照片</h1>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+  <a class="btn small ghost" href="/admin/photos?selected_date={{ previous_date.isoformat() }}">&lsaquo; 前一天</a>
+  <form method="get" action="/admin/photos" style="display:flex;gap:8px;align-items:center;">
+    <label for="selected-date" class="sr-only">选择日期</label>
+    <input id="selected-date" name="selected_date" type="date" value="{{ selected_date.isoformat() }}" style="width:auto;margin:0;" />
+    <button type="submit" class="small">查看</button>
+  </form>
+  <a class="btn small ghost" href="/admin/photos?selected_date={{ next_date.isoformat() }}">后一天 &rsaquo;</a>
+</div>
+
+<div class="card">
+  <h2>{{ selected_date.strftime('%Y年%m月%d日') }} 合照</h2>
+  {% if photos %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">
+    {% for photo in photos %}
+    <figure style="margin:0;">
+      <a href="/admin/photos/{{ photo.id }}/file" aria-label="查看{{ photo.team.name }}的合照">
+        <img src="/admin/photos/{{ photo.id }}/file" alt="{{ photo.team.name }} {{ selected_date.strftime('%Y年%m月%d日') }} 合照" style="width:100%;aspect-ratio:1;object-fit:cover;border:1px solid var(--line);border-radius:8px;display:block;" />
+      </a>
+      <figcaption class="muted" style="font-size:12px;margin-top:4px;">{{ photo.team.name }} · {{ photo.uploaded_at.strftime('%H:%M') }}</figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">当天没有上传合照。</p>
+  {% endif %}
+</div>
+{% endblock %}
