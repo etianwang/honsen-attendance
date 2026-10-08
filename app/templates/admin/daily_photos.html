@@ -42,7 +42,7 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">
     {% for photo in photos %}
     <figure style="margin:0;">
-      <a href="/admin/photos/{{ photo.id }}/file" aria-label="查看{{ photo.team.name }}的合照">
+      <a href="/admin/photos/{{ photo.id }}/file" class="photo-preview-link" aria-label="查看{{ photo.team.name }}的合照" aria-haspopup="dialog">
         <img src="/admin/photos/{{ photo.id }}/file" alt="{{ photo.team.name }} {{ selected_date.strftime('%Y年%m月%d日') }} 合照" style="width:100%;aspect-ratio:1;object-fit:cover;border:1px solid var(--line);border-radius:8px;display:block;" />
       </a>
       <figcaption class="muted" style="font-size:12px;margin-top:4px;">{{ photo.team.name }} · {{ photo.uploaded_at.strftime('%H:%M') }}</figcaption>
@@ -53,4 +53,35 @@
   <p class="muted">当天没有上传合照。</p>
   {% endif %}
 </div>
+<div id="photo-preview-modal" role="dialog" aria-modal="true" aria-label="合照预览" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:60;align-items:center;justify-content:center;">
+  <button type="button" id="photo-preview-close" aria-label="关闭照片预览" style="position:absolute;top:16px;right:16px;width:36px;height:36px;padding:0;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+  <img id="photo-preview-img" src="" alt="合照预览" style="max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;" />
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const modal = document.getElementById("photo-preview-modal");
+  const image = document.getElementById("photo-preview-img");
+  const close = document.getElementById("photo-preview-close");
+  let trigger;
+  const closePreview = () => {
+    modal.style.display = "none";
+    image.src = "";
+    trigger?.focus();
+  };
+  document.querySelectorAll(".photo-preview-link").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      trigger = link;
+      image.src = link.href;
+      modal.style.display = "flex";
+      close.focus();
+    });
+  });
+  close.addEventListener("click", closePreview);
+  modal.addEventListener("click", (event) => { if (event.target === modal) closePreview(); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && modal.style.display !== "none") closePreview(); });
+})();
+</script>
 {% endblock %}
