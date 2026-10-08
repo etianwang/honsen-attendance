@@ -13,6 +13,10 @@ from sqlalchemy.engine import URL, make_url
 def _postgres_tool(name: str) -> str:
     if found := shutil.which(name):
         return found
+    if os.name == "posix":
+        baota_tool = Path("/www/server/pgsql/bin") / name
+        if baota_tool.is_file():
+            return str(baota_tool)
     if os.name == "nt":
         install_root = Path(os.environ.get("ProgramFiles", r"C:\\Program Files")) / "PostgreSQL"
         if candidates := sorted(install_root.glob(f"*/bin/{name}.exe"), reverse=True):
