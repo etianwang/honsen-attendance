@@ -3,7 +3,7 @@ workbook into the new database, plus seed the attendance_values list and
 initial accounts (1 admin + 1 team lead per team).
 
 Usage:
-    python -m seed.seed_from_excel --year 2026 --month 8
+    python -m seed.seed_cote_divoire_from_excel --year 2026 --month 8
 """
 
 import argparse

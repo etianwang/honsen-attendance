@@ -1,6 +1,6 @@
-# 埃塞俄比亚考勤系统
+# Honsen 考勤系统
 
-Web 版考勤登记系统，给埃塞俄比亚项目部用，替代 Excel 手工登记。班组长按半天批量登记组员的工地/请假/加班情况，管理员看全局统计和工地人工报表；每个人有基本信息+头像，每天可以上传多张合照（上班/下班/加班等，不限类型，最多10张）防止代打卡，合照会同步到腾讯云 COS 存档。
+Web 版考勤登记系统，供各国家及项目部独立部署使用，替代 Excel 手工登记。班组长按半天批量登记组员的工地/请假/加班情况，管理员看全局统计和工地人工报表；每个人有基本信息+头像，每天可以上传多张合照（上班/下班/加班等，不限类型，最多10张）防止代打卡，合照会同步到腾讯云 COS 存档。
 
 管理员可在「设置 → 账号」创建“审计/统计（只读）”账号，供老板或人事查看全局统计、下载统计报表、查看员工花名册、每日上工情况和合照。该账号不绑定班组，不能录入、上传、管理账号或修改业务数据，只能修改自己的密码。
 
@@ -20,26 +20,22 @@ Web 版考勤登记系统，给埃塞俄比亚项目部用，替代 Excel 手工
    ./.venv/Scripts/python.exe -m pip install -r requirements.txt
    ```
 
-3. 复制 `.env.example` 为 `.env`（默认指向本机 PostgreSQL 的 5432 端口；Google Drive 那两行先留空也没关系，看下面第 6 节）。
+3. 复制 `.env.example` 为 `.env`（默认指向本机 PostgreSQL 的 5432 端口；可选云存储配置可暂时留空，详见下方存储配置说明）。
 
 4. 建表：
    ```bash
    ./.venv/Scripts/python.exe -m alembic upgrade head
    ```
 
-5. 种子数据 —— 埃塞俄比亚是全新起步，不导入旧数据，只建 1 个班组（埃塞酒店团队）+ 1 个工地（万豪酒店）+ 通用的请假/出差等可选值 + 1 个管理员 + 1 个班组长账号：
-   ```bash
-   ./.venv/Scripts/python.exe -m seed.seed_ethiopia
-   ```
-   会在终端打印新建的账号和临时密码，**请分发后自行修改**。员工名单为空，登录后到"花名册"页面手动添加组员。
+5. 初始化业务数据：从 `seed/` 选择当前部署对应的国家初始化脚本，执行 `python -m seed.<脚本模块名>`。脚本创建班组、工地、通用考勤选项和初始账号，具体配置以对应脚本为准。
 
-   （`seed/seed_from_excel.py` 是给科特迪瓦那批历史数据用的旧脚本，埃塞俄比亚用不上，留着以后要是有别的国家/项目部要导入 Excel 花名册可以参考。）
+   新建账号和随机初始密码会在终端显示，请妥善分发并修改密码。全新初始化不导入员工，登录后在花名册页面添加。历史 Excel 导入脚本单独使用，详见下方 seed 说明。
 
 6. 启动：
    ```bash
    ./.venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8010
    ```
-   注意：本机 8000 端口被另一个已有服务占用，这里用了 **8010**。
+   端口可按部署环境调整，以下统一使用 **8010**。
 
 7. 跑测试：
    ```bash
@@ -82,7 +78,7 @@ Web 版考勤登记系统，给埃塞俄比亚项目部用，替代 Excel 手工
 
 3. **建 OAuth 客户端**（注意不是服务账号）：「API 和服务」→「凭据」→「创建凭据」→「OAuth 客户端 ID」。如果是第一次建，会先要求配置"OAuth 同意屏幕"——用户类型选「外部」，应用名称随便填，测试阶段把自己的 Gmail 加到"测试用户"里就行，不需要提交审核。应用类型选 **「桌面应用」（Desktop app）**，名字随意，创建后下载它的 JSON 文件。这个文件不含私钥泄露风险那么高，但也不要提交到代码仓库，放到 `secrets/gdrive-oauth-client.json`。
 
-4. **在 Google Drive 里建一个文件夹专门存合照**，比如叫"埃塞俄比亚考勤合照"（这是你自己的账号自己的文件夹，不需要分享给任何人）。
+4. **在 Google Drive 里建一个文件夹专门存合照**，按项目名称命名（这是你自己的账号自己的文件夹，不需要分享给任何人）。
 
 5. **拿到文件夹 ID**：打开这个文件夹，浏览器地址栏最后一段就是文件夹 ID（`https://drive.google.com/drive/folders/`**`这一串`**）。
 
@@ -103,7 +99,7 @@ Web 版考勤登记系统，给埃塞俄比亚项目部用，替代 Excel 手工
 
 ## Ubuntu 生产部署
 
-以下流程适用于 Ubuntu 服务器上的 `/www/wwwroot/attendance-et`。同一服务器部署多个项目时，**每个项目必须使用独立数据库**；本项目使用 `attendance_et`。
+以下流程适用于 Ubuntu 服务器上的 `/www/wwwroot/honsen-attendance`。同一服务器部署多个项目时，**每个项目必须使用独立数据库**，并分别配置应用目录、端口和上传目录。
 
 1. 安装 PostgreSQL、Git 和 Python 虚拟环境支持：
    ```bash
@@ -118,15 +114,15 @@ Web 版考勤登记系统，给埃塞俄比亚项目部用，替代 Excel 手工
    ```
    ```sql
    CREATE USER attendance WITH PASSWORD '换成强密码';
-   CREATE DATABASE attendance_et OWNER attendance;
+   CREATE DATABASE attendance OWNER attendance;
    \q
    ```
 
 3. 拉取代码并安装依赖：
    ```bash
    cd /www/wwwroot
-   git clone https://github.com/etianwang/honsen-attendance.git attendance-et
-   cd attendance-et
+   git clone https://github.com/etianwang/honsen-attendance.git honsen-attendance
+   cd honsen-attendance
    python3 -m venv .venv
    .venv/bin/pip install -r requirements.txt
    ```
@@ -138,18 +134,17 @@ Web 版考勤登记系统，给埃塞俄比亚项目部用，替代 Excel 手工
    ```
    至少修改为：
    ```env
-   DATABASE_URL=postgresql+psycopg://attendance:换成强密码@127.0.0.1:5432/attendance_et
+   DATABASE_URL=postgresql+psycopg://attendance:换成强密码@127.0.0.1:5432/attendance
    SECRET_KEY=换成随机长字符串
    UPLOAD_DIR=uploads
    ```
    如需每日合照同步到腾讯云 COS，再填写 `COS_SECRET_ID`、`COS_SECRET_KEY`、`COS_BUCKET` 和 `COS_REGION`。
 
-5. 初始化表结构和埃塞俄比亚项目数据：
+5. 初始化表结构和业务数据：
    ```bash
    .venv/bin/python -m alembic upgrade head
-   .venv/bin/python -m seed.seed_ethiopia
    ```
-   种子脚本会创建“埃塞酒店团队”、万豪酒店，以及 `admin` 和 `lifan` 账号；终端会打印随机初始密码。只在新数据库执行一次。
+   然后选择当前部署对应的 seed，通过 `.venv/bin/python -m seed.<脚本模块名>` 初始化业务数据。账号和工地配置以脚本为准，初始密码在终端显示。
 
 6. 临时启动验证：
    ```bash
@@ -159,25 +154,35 @@ Web 版考勤登记系统，给埃塞俄比亚项目部用，替代 Excel 手工
 
 7. 后续更新：
    ```bash
-   cd /www/wwwroot/attendance-et
+   cd /www/wwwroot/honsen-attendance
    git pull --ff-only
    .venv/bin/pip install -r requirements.txt
    .venv/bin/python -m alembic upgrade head
    ```
    若 Git 提示 `dubious ownership`，确认目录确实是本项目后执行一次：
    ```bash
-   git config --global --add safe.directory /www/wwwroot/attendance-et
+   git config --global --add safe.directory /www/wwwroot/honsen-attendance
    ```
    最后重启应用服务。
 
 ## 目录结构
 
 - `app/` — FastAPI 应用（models / routers / services / templates / static）
-- `seed/seed_cameroon.py` — 喀麦隆全新起步用的种子脚本（1班组+1工地，不导入旧数据）
-- `seed/seed_ethiopia.py` — 埃塞俄比亚全新起步用的种子脚本（1班组+1工地，不导入旧数据）
-- `seed/seed_from_excel.py` — 旧的科特迪瓦 Excel 花名册导入脚本，喀麦隆不需要
+- `seed/` — 按国家命名的初始化脚本及历史 Excel 导入脚本
 - `uploads/` — 头像和每日合照的本地存储目录（`avatars/`、`daily_photos/`），不要提交到代码仓库
 - `alembic/` — 数据库迁移
 - `tests/` — pytest 测试（统计规则、花名册复制、权限隔离）
-- `科特迪瓦考勤登记表2026.xlsx` — 科特迪瓦旧的 Excel 考勤表，作为历史存档保留
 - `merge_attendance.py` — 早期一个不同方案（导出JSON合并回Excel）的脚本，新系统已不再使用这条路径
+
+## seed 管理
+
+每个国家或项目部署使用独立数据库，建表后选择对应初始化脚本。seed 文件统一按以下规则命名：
+
+- `seed_<国家英文标识>.py`：全新部署初始化，定义班组、项目工地、通用考勤选项和初始账号。
+- `seed_<国家英文标识>_from_excel.py`：历史 Excel 数据导入，按工作簿恢复班组、员工和月度花名册。
+
+全新初始化使用 `python -m seed.<脚本模块名>`；历史导入还需提供 `--excel`、`--year`、`--month`。可通过 `--help` 查看所选脚本的参数。全新初始化脚本支持管理员及班组长的账号、密码参数，历史导入脚本支持管理员账号、密码参数。
+
+现有 seed 遇到同名班组、考勤选项和账号会跳过，不会重置密码或删除数据。修改脚本后重新运行可以补充新增项，但不会自动重命名、修改或移除已有项。新增国家时应创建独立脚本，保持国家标识一致，并检查班组、工地和账号配置。
+
+seed 用于初始化业务数据；表结构变更统一通过 Alembic 迁移管理。已有生产数据的部署在更新前应先备份，并确认所选脚本与目标数据库对应。
