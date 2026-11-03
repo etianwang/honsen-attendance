@@ -165,6 +165,34 @@ Web 版考勤登记系统，供各国家及项目部独立部署使用，替代 
    ```
    最后重启应用服务。
 
+## 虚拟环境配置与启动排查
+
+虚拟环境需在实际部署目录创建，不随 Git 分发，也不要从其他服务器复制。Ubuntu 上先将路径替换为实际项目目录，再执行：
+
+```bash
+cd /你的项目部署目录
+ls requirements.txt app/main.py
+sudo apt update
+sudo apt install -y python3-venv
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python --version
+```
+
+若 `ls` 提示文件不存在，先确认代码已拉取到当前目录。后续安装依赖、数据库迁移和启动应用均使用该目录下的 `.venv/bin/python`，无需先激活虚拟环境。
+
+若日志出现 `nohup: failed to run command '…/.venv/bin/python': No such file or directory`，检查启动配置中的项目路径，并在该目录按上述步骤创建虚拟环境、安装依赖。首次部署还需配置 `.env`、初始化数据库并选择对应 seed。
+
+在项目目录中可临时后台启动验证：
+
+```bash
+nohup .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8010 > app.log 2>&1 &
+tail -n 50 app.log
+```
+
+生产环境使用 systemd 或服务器面板管理进程，工作目录设为实际项目目录，启动命令中的 Python 路径指向该目录的 `.venv/bin/python`。避免同时运行多个使用相同端口的应用进程。
+
 ## 目录结构
 
 - `app/` — FastAPI 应用（models / routers / services / templates / static）
