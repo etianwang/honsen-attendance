@@ -5,7 +5,7 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -16,9 +16,10 @@ from app.auth.dependencies import require_admin
 from app.auth.security import hash_password
 from app.database import SessionLocal, engine, get_db
 from app.config import settings
-from app.models import AttendanceValue, Team, User, UserRole, ValueCategory
+from app.models import AttendanceValue, EmployeeStatus, Team, User, UserRole, ValueCategory
 from app.services.database_backup_service import create_backup, restore_backup, upgrade_schema
 from app.templates_env import templates
+from app.services.roster_service import get_roster, remove_employee_from_roster
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
 backup_router = APIRouter(prefix="/admin")
@@ -114,6 +115,45 @@ async def restore_database_backup(
         await backup.close()
     request.session.clear()
     return RedirectResponse(url="/login?ok=数据库已恢复，请重新登录", status_code=303)
+
+
+@router.get("/teams/{team_id}/members")
+def admin_team_members(
+    request: Request,
+    team_id: int,
+    year: int | None = Query(None, ge=1, le=9999),
+    month: int | None = Query(None, ge=1, le=12),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    team = db.get(Team, team_id)
+    if team is None:
+        raise HTTPException(status_code=404, detail="找不到该班组")
+    today = date.today()
+    year = year or today.year
+    month = month or today.month
+    return templates.TemplateResponse(request, "admin/team_members.html", {
+        "user": user, "active_nav": "settings", "team": team,
+        "year": year, "month": month, "EmployeeStatus": EmployeeStatus,
+        "roster": get_roster(db, team_id, year, month, active_only=True),
+    })
+
+
+@router.post("/teams/{team_id}/members/{employee_id}/remove")
+def admin_team_member_remove(
+    team_id: int,
+    employee_id: int,
+    year: int = Form(..., ge=1, le=9999),
+    month: int = Form(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    if db.get(Team, team_id) is None:
+        raise HTTPException(status_code=404, detail="找不到该班组")
+    removed = remove_employee_from_roster(db, team_id, year, month, employee_id)
+    message = "已移出班组，人员资料和历史考勤已保留" if removed else "该成员已移出或不在该月班组中"
+    return RedirectResponse(
+        url=f"/admin/teams/{team_id}/members?year={year}&month={month}&ok={message}", status_code=303,
+    )
 
 
 @router.post("/teams/add")

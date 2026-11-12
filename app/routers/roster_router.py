@@ -2,7 +2,6 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_team_scope
@@ -34,7 +33,7 @@ def roster_page(
     year = year or today.year
     month = month or today.month
     team = db.get(Team, team_id)
-    roster = get_roster(db, team_id, year, month)
+    roster = get_roster(db, team_id, year, month, active_only=True)
     candidates = list_present_candidates(db, team_id, year, month)
     return templates.TemplateResponse(
         request,
@@ -94,13 +93,6 @@ def roster_remove(
         return RedirectResponse(
             url=f"/roster/{team_id}?year={year}&month={month}&err=密码不对，未移除", status_code=303
         )
-    try:
-        removed = remove_employee_from_roster(db, team_id, year, month, employee_id)
-    except IntegrityError:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/roster/{team_id}?year={year}&month={month}&err=该员工本月已有考勤记录，不能直接移除",
-            status_code=303,
-        )
+    removed = remove_employee_from_roster(db, team_id, year, month, employee_id)
     msg = "已移除" if removed else "未找到该员工"
     return RedirectResponse(url=f"/roster/{team_id}?year={year}&month={month}&ok={msg}", status_code=303)

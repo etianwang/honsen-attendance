@@ -23,7 +23,8 @@ def roster_employee_ids(db: Session, team_id: int, year: int, month: int) -> lis
     return list(
         db.scalars(
             select(MonthlyRoster.employee_id).where(
-                MonthlyRoster.team_id == team_id, MonthlyRoster.year == year, MonthlyRoster.month == month
+                MonthlyRoster.team_id == team_id, MonthlyRoster.year == year, MonthlyRoster.month == month,
+                MonthlyRoster.is_active.is_(True)
             )
         )
     )

@@ -58,6 +58,7 @@
         <td><input type="text" form="team-form-{{ team.id }}" name="name" value="{{ team.name }}" style="margin:0;min-width:140px;" required /></td>
         <td>{{ "启用" if team.is_active else "停用" }}</td>
         <td>
+          <a class="btn small ghost" href="/admin/teams/{{ team.id }}/members">成员管理</a>
           <button type="submit" form="team-form-{{ team.id }}" class="small">保存</button>
           <form method="post" action="/admin/teams/{{ team.id }}/toggle-active" style="display:inline;"
                 onsubmit="{{ '' if team.is_active else 'return true;' }}{{ 'return confirm(\'停用后这个班组不会再出现在日常录入和新建账号的选项里，历史记录不会丢，确定吗？\');' if team.is_active }}">

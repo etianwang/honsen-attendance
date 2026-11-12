@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}成员管理 · {{ team.name }}{% endblock %}
+{% block content %}
+<h1>{{ team.name }} — 成员管理{{ '（班组已停用）' if not team.is_active }}</h1>
+<div class="card">
+  <a class="btn ghost small" href="/admin/settings?tab=teams">返回班组管理</a>
+  <p class="muted">成员按月管理。移出仅对所选月份生效，不影响其他班组或其他月份；人员资料和历史考勤保留，复制到下月时会跳过已移出的成员。</p>
+  <form method="get" class="grid-2" style="max-width:440px;">
+    <div><label for="year">年份</label><input id="year" name="year" type="number" min="1" max="9999" value="{{ year }}" required /></div>
+    <div><label for="month">月份</label><select id="month" name="month">{% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if m == month }}>{{ m }}月</option>{% endfor %}</select></div>
+    <div><button type="submit">查看成员</button></div>
+  </form>
+</div>
+<div class="card">
+  <h2>{{ year }}年{{ month }}月 · {{ roster|length }} 位成员</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>姓名</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>{% for row in roster %}<tr>
+      <td>{{ row.employee.full_name }}</td>
+      <td>{{ '在场' if row.employee.status == EmployeeStatus.active else ('回国' if row.employee.status == EmployeeStatus.returned else '停工') }}</td>
+      <td><a class="btn small ghost" href="/employee/{{ row.employee_id }}">个人信息</a>
+        <form method="post" action="/admin/teams/{{ team.id }}/members/{{ row.employee_id }}/remove" style="display:inline;" data-name="{{ row.employee.full_name }}" onsubmit="return confirm('确定将“' + this.dataset.name + '”从本班组的{{ year }}年{{ month }}月成员中移出吗？人员资料和历史考勤将保留。');">
+          <input type="hidden" name="year" value="{{ year }}" /><input type="hidden" name="month" value="{{ month }}" />
+          <button type="submit" class="small ghost">移出班组</button>
+        </form>
+      </td>
+    </tr>{% else %}<tr><td colspan="3" class="muted">该月暂无成员。</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <p><a href="/roster/{{ team.id }}?year={{ year }}&month={{ month }}">添加成员 / 重新加入</a></p>
+</div>
+{% endblock %}

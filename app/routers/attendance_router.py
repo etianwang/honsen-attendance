@@ -57,7 +57,7 @@ class IndividualEditRequest(BaseModel):
 
 
 def _roster_employee_ids(db: Session, team_id: int, year: int, month: int) -> set[int]:
-    return {r.employee_id for r in get_roster(db, team_id, year, month)}
+    return {r.employee_id for r in get_roster(db, team_id, year, month, active_only=True)}
 
 
 def _get_scoped_photo(db: Session, team_id: int, year: int, month: int, day: int, photo_id: int):
@@ -81,7 +81,7 @@ def attendance_day_page(
     db: Session = Depends(get_db),
 ):
     team = db.get(Team, team_id)
-    roster = get_roster(db, team_id, year, month)
+    roster = get_roster(db, team_id, year, month, active_only=True)
     pairs = [(r.employee_id, team_id) for r in roster]
     entries = get_entries_for_day(db, pairs, year, month, day)
     excluded_default = get_left_yesterday_employee_ids(db, pairs, year, month, day)

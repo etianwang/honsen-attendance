@@ -10,7 +10,7 @@ def prev_month(year: int, month: int) -> tuple[int, int]:
     return year, month - 1
 
 
-def get_roster(db: Session, team_id: int, year: int, month: int) -> list[MonthlyRoster]:
+def get_roster(db: Session, team_id: int, year: int, month: int, *, active_only: bool = False) -> list[MonthlyRoster]:
     stmt = (
         select(MonthlyRoster)
         .options(joinedload(MonthlyRoster.employee))
@@ -18,10 +18,12 @@ def get_roster(db: Session, team_id: int, year: int, month: int) -> list[Monthly
         .where(MonthlyRoster.team_id == team_id, MonthlyRoster.year == year, MonthlyRoster.month == month)
         .order_by(Employee.full_name)
     )
+    if active_only:
+        stmt = stmt.where(MonthlyRoster.is_active.is_(True))
     return list(db.scalars(stmt))
 
 
-def get_all_teams_roster(db: Session, year: int, month: int) -> list[MonthlyRoster]:
+def get_all_teams_roster(db: Session, year: int, month: int, *, active_only: bool = False) -> list[MonthlyRoster]:
     """Same shape as get_roster but across every team — for the admin
     "全体录入" page, so an admin doesn't have to click into each team one by
     one just to enter a normal day."""
@@ -33,6 +35,8 @@ def get_all_teams_roster(db: Session, year: int, month: int) -> list[MonthlyRost
         .where(MonthlyRoster.year == year, MonthlyRoster.month == month)
         .order_by(Team.name, Employee.full_name)
     )
+    if active_only:
+        stmt = stmt.where(MonthlyRoster.is_active.is_(True))
     return list(db.scalars(stmt))
 
 
@@ -42,7 +46,8 @@ def copy_forward(db: Session, team_id: int, year: int, month: int) -> int:
     py, pm = prev_month(year, month)
     prev_rows = db.scalars(
         select(MonthlyRoster).where(
-            MonthlyRoster.team_id == team_id, MonthlyRoster.year == py, MonthlyRoster.month == pm
+            MonthlyRoster.team_id == team_id, MonthlyRoster.year == py, MonthlyRoster.month == pm,
+            MonthlyRoster.is_active.is_(True)
         )
     ).all()
     existing_employee_ids = {
@@ -71,7 +76,8 @@ def list_present_candidates(db: Session, team_id: int, year: int, month: int) ->
     already_on_roster = set(
         db.scalars(
             select(MonthlyRoster.employee_id).where(
-                MonthlyRoster.team_id == team_id, MonthlyRoster.year == year, MonthlyRoster.month == month
+                MonthlyRoster.team_id == team_id, MonthlyRoster.year == year, MonthlyRoster.month == month,
+                MonthlyRoster.is_active.is_(True)
             )
         )
     )
@@ -96,7 +102,7 @@ def all_employees_with_current_teams(
     roster_rows = db.scalars(
         select(MonthlyRoster)
         .options(joinedload(MonthlyRoster.team))
-        .where(MonthlyRoster.year == year, MonthlyRoster.month == month)
+        .where(MonthlyRoster.year == year, MonthlyRoster.month == month, MonthlyRoster.is_active.is_(True))
     ).all()
     teams_by_employee: dict[int, list[str]] = {}
     for r in roster_rows:
@@ -120,6 +126,8 @@ def add_employee_to_roster(db: Session, team_id: int, year: int, month: int, emp
         )
     )
     if existing:
+        existing.is_active = True
+        db.commit()
         return existing
     row = MonthlyRoster(employee_id=employee_id, team_id=team_id, year=year, month=month)
     db.add(row)
@@ -147,6 +155,7 @@ def add_employees_bulk(db: Session, team_id: int, year: int, month: int, employe
 
 
 def remove_employee_from_roster(db: Session, team_id: int, year: int, month: int, employee_id: int) -> bool:
+    # Keep the row for attendance foreign keys and historical reports.
     row = db.scalar(
         select(MonthlyRoster).where(
             MonthlyRoster.employee_id == employee_id,
@@ -155,8 +164,8 @@ def remove_employee_from_roster(db: Session, team_id: int, year: int, month: int
             MonthlyRoster.month == month,
         )
     )
-    if row is None:
+    if row is None or not row.is_active:
         return False
-    db.delete(row)
+    row.is_active = False
     db.commit()
     return True

@@ -59,7 +59,7 @@ def _all_teams_pairs(db: Session, year: int, month: int) -> set[tuple[int, int]]
     return set(
         db.execute(
             select(MonthlyRoster.employee_id, MonthlyRoster.team_id).where(
-                MonthlyRoster.year == year, MonthlyRoster.month == month
+                MonthlyRoster.year == year, MonthlyRoster.month == month, MonthlyRoster.is_active.is_(True)
             )
         ).all()
     )
@@ -80,7 +80,7 @@ def admin_attendance_day_page(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    roster = get_all_teams_roster(db, year, month)
+    roster = get_all_teams_roster(db, year, month, active_only=True)
     pairs = [(r.employee_id, r.team_id) for r in roster]
     entries = get_entries_for_day(db, pairs, year, month, day)
     excluded_default = get_left_yesterday_employee_ids(db, pairs, year, month, day)
